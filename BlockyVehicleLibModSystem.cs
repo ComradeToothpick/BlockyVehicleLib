@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using HarmonyLib;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -29,8 +30,11 @@ public class BlockyVehicleLibModSystem : ModSystem
     public ICoreClientAPI capi;
     private Dictionary<string, int> _dimensionRegistry = null!;
     private Dictionary<int, BlockyVehicle> _loadedMinidimensions = new Dictionary<int, BlockyVehicle>();
+    private Dictionary<int, long> _loadedEntityVehicles = new Dictionary<int, long>();
     private int _dimensionIndex = -1;
     private bool _spawnSuccess = false;
+    //private Harmony harmony;
+    
     
 
     //Each player only gets one minidimension (for now)
@@ -45,7 +49,13 @@ public class BlockyVehicleLibModSystem : ModSystem
     // Useful for registering block/entity classes on both sides
     public override void Start(ICoreAPI coreApi)
     {
-        api.RegisterEntity(Mod.Info.ModID + ".vehicle", typeof(EntityChunky));
+        //harmony patching not necessary yet
+        //harmony = new Harmony(Mod.Info.ModID);
+        //harmony.PatchAll();
+        
+        api.Logger.Event(Mod.Info.ModID + ".vehicle");
+        api.RegisterEntity(Mod.Info.ModID + ".vehicle", typeof(EntityVehicle));
+        //api.RegisterEntityClass(Mod.Info.ModID + ".entities.vehicle", typeof(EntityVehicle));
         api.RegisterItemClass(Mod.Info.ModID + ".vehiclewand", typeof(ItemVehicleWand));
         api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".basevehiclephysics", typeof(PhysicsBehaviorBaseVehicle));
         api.RegisterEntityBehaviorClass("blockyvehiclelib.entityvehiclephysics", typeof(EntityBehaviorVehiclePhysics));
@@ -57,7 +67,8 @@ public class BlockyVehicleLibModSystem : ModSystem
             .RegisterMessageType<DimensionIndexResponse>()
             .RegisterMessageType<DimensionSpawnRequest>()
             .RegisterMessageType<DimensionSpawnClientResponse>()
-            .RegisterMessageType<DimensionSpawnClientComplete>();
+            .RegisterMessageType<DimensionSpawnClientComplete>()
+            .RegisterMessageType<VehicleEntityId>();
     }
 
     IServerNetworkChannel serverChannel;
@@ -94,9 +105,9 @@ public class BlockyVehicleLibModSystem : ModSystem
             api.Logger.Error("Could not find player entity");
             return;
         }
-        var BVLbehaviors = new List<JsonObject>(1);
+        var BVLbehaviors = new List<JsonObject>(1);//Behavior adding code courtesy of HoD authors Chronolegionaire and TheInsanityGod
 
-        //Forcibly insert behaviors to ensure they are present //TODO most of these are only really needed for th server but some are on client as well for now for accessibility
+        //Forcibly insert behaviors to ensure they are present
         BVLbehaviors.Add(new(new JObject { ["code"] =  "blockyvehiclelib.entityvehiclephysics" }));
 
         playerEntity.Server.BehaviorsAsJsonObj = [
@@ -145,8 +156,15 @@ public class BlockyVehicleLibModSystem : ModSystem
         
         clientChannel = capi.Network.GetChannel("VehicleNetworkApi")
             .SetMessageHandler<DimensionIndexResponse>(OnDimensionIndexResponse)
-            .SetMessageHandler<DimensionSpawnClientResponse>(OnDimensionSpawnClientResponse);
+            .SetMessageHandler<DimensionSpawnClientResponse>(OnDimensionSpawnClientResponse)
+            .SetMessageHandler<VehicleEntityId>(OnVehicleEntityId);
         //Mod.Logger.Notification("Hello from template mod client side: " + Lang.Get("Vehicle:hello"));
+    }
+    
+    private void OnVehicleEntityId(VehicleEntityId message)
+    {
+        //send the EntityId to the client.player.playerentity.EntityBehaviourVehiclePhysics.collisionTester
+        capi.World.Player.Entity.GetBehavior<EntityBehaviorVehiclePhysics>().AddVehicle(message.entityId, message.subDimensionId);
     }
 
     
@@ -172,20 +190,29 @@ public class BlockyVehicleLibModSystem : ModSystem
         
         IMiniDimension? messageDim = sapi.Server.GetMiniDimension(message.dimensionIndex);
         BlockyVehicle dim;
-        
+        bool loadedDim = false;
         //set the loaded minidimension to the correct index (should be unnecessary in current state, but will keep for future proofing)
         BlockPos pos = message.blockSel.Position.Copy();
         
         if (messageDim == null)
         {
             dim = new BlockyVehicle((BlockAccessorBase)sapi.World.BlockAccessor, pos.ToVec3d(), sapi);
-            sapi.Server.SetMiniDimension(dim, message.dimensionIndex);
+            sapi.Server.SetMiniDimension(dim, message.dimensionIndex);//this needs to be fixed
             _loadedMinidimensions.Add(message.dimensionIndex, dim);
-            sapi.Logger.Error("Mini dimension not found, new dimension created");
+            sapi.Logger.Error("message not found, new dimension created");
         }
         else
         {
-            dim = _loadedMinidimensions[message.dimensionIndex];
+            if (_loadedMinidimensions.ContainsKey(message.dimensionIndex))
+            {
+                dim = _loadedMinidimensions[message.dimensionIndex];
+                loadedDim = true;
+            }
+            else
+            {
+                dim = new BlockyVehicle((BlockAccessorBase)sapi.World.BlockAccessor, pos.ToVec3d(), sapi);
+                sapi.Logger.Error("Mini dimension not found, new dimension created");
+            }
             sapi.Server.SetMiniDimension(dim, message.dimensionIndex);
             dim.CurrentPos.SetPos(pos); //repeat this on client side
         }
@@ -204,10 +231,21 @@ public class BlockyVehicleLibModSystem : ModSystem
         
         dim.ClearChunks();
         //create the entity and associate it with the minidimension
-        //TODO: need to find preexisting entities and either recycle them or remove them
-        EntityChunky entity = EntityVehicle.CreateVehicle(sapi, dim);
-        sapi.World.SpawnEntity(entity);
-        entity.Pos.Add(0.5f, 1f, 0.5f);
+        //or find the entity if it already exists and move it.
+        //Doing it this way stops the rotation
+        EntityVehicle entity;
+        if (loadedDim && _loadedEntityVehicles.TryGetValue(message.dimensionIndex, out long entityId))
+        {
+            entity = (EntityVehicle)sapi.World.GetEntityById(entityId);
+        }
+        else
+        {
+            entity = EntityVehicle.CreateVehicle(sapi, dim);
+            sapi.World.SpawnEntity(entity);
+            _loadedEntityVehicles.TryAdd(message.dimensionIndex, entity.EntityId);
+        }
+
+        entity.Pos.SetPos(pos.X + 0.5f, pos.Y + 1f, pos.Z + 0.5f);
         dim.CurrentPos.SetPos(entity.Pos);
         serverChannel.SendPacket(new DimensionSpawnClientResponse() {dimId = dim.subDimensionId, blockPos = pos, vecPos = message.pos, blockId = message.blockId}, (IServerPlayer) player);
         await WaitingOnClient();
@@ -269,10 +307,8 @@ public class BlockyVehicleLibModSystem : ModSystem
             
             Vec3d newPos = message.vecPos.Add(new Vec3f(0.5f, 1.0f, 0.5f));
             //dim.CurrentPos.SetPos(newPos);
-            dim.selectionTrackingOriginalPos = message.blockPos;//!!!!!!!!!!
+            dim.selectionTrackingOriginalPos = message.blockPos;//Need to set this for it to render in the world
             dim.selectionTrackingOriginalPos.Y += 1;
-            WireframeCube.CreateUnitCube(capi);
-            WireframeCube.CreateCenterOriginCube(capi);
             capi.World.SpawnEntity(EntityVehicle.CreateVehicle(capi, dim));
             clientChannel.SendPacket(new DimensionSpawnClientComplete() {success = true});
         }
@@ -298,6 +334,7 @@ public class BlockyVehicleLibModSystem : ModSystem
     {
         if (api.Side == EnumAppSide.Server)
         {
+            player.Entity.GetBehavior<EntityBehaviorVehiclePhysics>().entity = (Entity) player.Entity;
             //if (player.Entity.GetBehavior<EntityBehaviorVehiclePhysics>() == null) sapi.Logger.Event("Behavior not found");
             //else sapi.Logger.Event("Behavior found");
             //This testing revealed the behavior is getting added successfully.
@@ -336,5 +373,10 @@ public class BlockyVehicleLibModSystem : ModSystem
         //check how schematics are saved and copy that? Could get big and messy
         //empty dimensions should get skipped, will add later
         sapi.WorldManager.SaveGame.StoreData("Vehicle.DimensionRegistry", SerializerUtil.Serialize(_dimensionRegistry));
+    }
+    
+    public override void Dispose() 
+    {
+        //harmony.UnpatchAll(Mod.Info.ModID);
     }
 }

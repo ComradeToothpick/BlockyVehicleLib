@@ -1,6 +1,6 @@
 {
   "code": "vehicle",
-  "class": "EntityChunky",
+  "class": "blockyvehiclelib.vehicle",
   "hitboxSize": { "x": 1, "y": 1 },
   "client": {
     "renderer": "Dummy",

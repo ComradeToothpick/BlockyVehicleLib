@@ -56,6 +56,13 @@ namespace BlockyVehicleLib.Network
         [ProtoMember(1)]
         public bool success;
     }
+
+    [ProtoContract]
+    public class VehicleEntityId
+    {
+        [ProtoMember(1)] public long entityId;
+        [ProtoMember(2)] public int subDimensionId;
+    }
     
     [ProtoContract]
     public class VehicleDimPacket

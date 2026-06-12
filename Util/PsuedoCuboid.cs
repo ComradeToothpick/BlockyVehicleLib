@@ -160,15 +160,33 @@ namespace BlockyVehicleLib.Util
             return this;
         }
 
+        
+        /*
+        w = c1 c2 c3 - s1 s2 s3
+        x = s1 s2 c3 +c1 c2 s3
+        y = s1 c2 c3 + c1 s2 s3
+        z = c1 s2 c3 - s1 c2 s3
+        
+        Where:
+        c1 = cos(yaw / 2)
+        c2 = cos(pitch / 2)
+        c3 = cos(roll / 2)
+        s1 = sin(yaw / 2)
+        s2 = sin(pitch / 2)
+        s3 = sin(roll / 2)
+        */
         public static double[] ConvertEulerAngles(double pitch, double yaw, double roll)
         {
-            double[] qz = [0.0, 0.0, Math.Sin(roll/2), Math.Cos(roll/2)];
-            double[] qy = [0.0, Math.Sin(yaw/2), 0.0, Math.Cos(yaw/2)];
-            double[] qx = [0.0, 0.0, Math.Sin(pitch/2), Math.Cos(pitch/2)];
-            double[] q = Identity;
-            Quaterniond.Multiply(q, qz, qy);
-            Quaterniond.Multiply(q, q, qx);
-            return q;
+            double[] output = new double[4];
+            output[0] = Math.Sin(yaw / 2) * Math.Sin(pitch / 2) * Math.Cos(roll / 2) +
+                        Math.Cos(yaw / 2) * Math.Cos(pitch / 2) * Math.Sin(roll / 2);
+            output[1] = Math.Sin(yaw / 2) * Math.Cos(pitch / 2) * Math.Cos(roll / 2) +
+                        Math.Cos(yaw / 2) * Math.Sin(pitch / 2) * Math.Sin(roll / 2);
+            output[2] = Math.Cos(yaw / 2) * Math.Sin(pitch / 2) * Math.Cos(roll / 2) -
+                        Math.Sin(yaw / 2) * Math.Cos(pitch / 2) * Math.Sin(roll / 2);
+            output[3] = Math.Cos(yaw / 2) * Math.Cos(pitch / 2) * Math.Cos(roll / 2) - 
+                        Math.Sin(yaw / 2) * Math.Sin(pitch / 2) * Math.Sin(roll / 2);
+            return output;
         }
         
         public void SetInternalCorners()
@@ -233,6 +251,13 @@ namespace BlockyVehicleLib.Util
         {
             this.rotation = rotation;
             externalCornersDirty = true;
+        }
+
+        public void SetPosition(double x, double y, double z)
+        {
+            this.pos = new Vec3d(x, y, z);
+            externalCornersDirty = true;
+            GetExternalCorners();
         }
 
         public double[] ApplyRotation(double[] angVelocity, double[] rot, double dt)

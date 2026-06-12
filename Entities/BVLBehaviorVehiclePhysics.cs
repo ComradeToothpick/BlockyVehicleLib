@@ -123,7 +123,7 @@ public class VehicleBehaviourVehiclePhysics(EntityChunky entity) :
     if (motion.Length() > 20.0)
       motion.Set(0.0, 0.0, 0.0);
     this.entity.Pos.Motion.Set(motion);
-    PhysicsBehaviorBaseVehicle.collisionTester.NewTick(lPos);
+    PhysicsBehaviorBaseVehicle.vCollisionTester.NewTick(lPos);
     this.SetState(lPos);
     this.RemoteMotionAndCollision(lPos, dtFactor);
     this.ApplyTests(lPos);
@@ -133,7 +133,7 @@ public class VehicleBehaviourVehiclePhysics(EntityChunky entity) :
   {
     double num = this.GravityPerSecond / 60.0 * (double) dtFactor + Math.Max(0.0, -0.014999999664723873 * pos.Motion.Y * (double) dtFactor);
     pos.Motion.Y -= num;
-    PhysicsBehaviorBaseVehicle.collisionTester.ApplyTerrainCollision(this.entity, pos, dtFactor, ref this.newPos, 0.0f, this.CollisionYExtra);
+    PhysicsBehaviorBaseVehicle.vCollisionTester.ApplyTerrainCollision(this.entity, pos, dtFactor, ref this.newPos, 0.0f, this.CollisionYExtra);
     this.entity.OnGround = this.entity.CollidedVertically & pos.Motion.Y < 0.0;
     pos.Motion.Y += num;
     pos.SetPos(this.nPos);
@@ -216,7 +216,7 @@ public class VehicleBehaviourVehiclePhysics(EntityChunky entity) :
 
   protected virtual void applyCollision(EntityPos pos, float dtFactor)
   {
-    PhysicsBehaviorBaseVehicle.collisionTester.ApplyTerrainCollision(this.entity, pos, dtFactor, ref this.newPos, 0.0f, this.CollisionYExtra);
+    PhysicsBehaviorBaseVehicle.vCollisionTester.ApplyTerrainCollision(this.entity, pos, dtFactor, ref this.newPos, 0.0f, this.CollisionYExtra);
   }
 
   public void ApplyTests(EntityPos pos)
@@ -263,12 +263,12 @@ public class VehicleBehaviourVehiclePhysics(EntityChunky entity) :
     }
     else
     {
-      Cuboidd entityBox = PhysicsBehaviorBaseVehicle.collisionTester.entityBox;
+      Cuboidd entityBox = PhysicsBehaviorBaseVehicle.vCollisionTester.entityBox;
       int x2 = (int) entityBox.X2;
       int y2 = (int) entityBox.Y2;
       int z2 = (int) entityBox.Z2;
       int z1 = (int) entityBox.Z1;
-      BlockPos tmpPos = PhysicsBehaviorBaseVehicle.collisionTester.tmpPos;
+      BlockPos tmpPos = PhysicsBehaviorBaseVehicle.vCollisionTester.tmpPos;
       tmpPos.SetDimension(entity.Pos.Dimension);
       for (int y1 = (int) entityBox.Y1; y1 <= y2; ++y1)
       {
@@ -300,7 +300,7 @@ public class VehicleBehaviourVehiclePhysics(EntityChunky entity) :
     if ((mountableSupplier != null ? (mountableSupplier.IsBeingControlled() ? 1 : 0) : 0) != 0 && entity.World.Side == EnumAppSide.Server)
       return;
     EntityPos pos = entity.Pos;
-    PhysicsBehaviorBaseVehicle.collisionTester.AssignToEntity((PhysicsBehaviorBaseVehicle) this, pos.Dimension);
+    PhysicsBehaviorBaseVehicle.vCollisionTester.AssignToEntity((PhysicsBehaviorBaseVehicle) this, pos.Dimension);
     int num = pos.Motion.Length() > 0.1 ? 10 : 1;
     float dt1 = dt / (float) num;
     for (int index = 0; index < num; ++index)

@@ -18,10 +18,11 @@ namespace BlockyVehicleLib.Entities;
 /// This provides functionality for physics-based entity behaviors. It is not an entity behavior on its own.
 /// </summary>
 [DocumentAsJson]
-public abstract class PhysicsBehaviorBaseVehicle(Entity entity) : PhysicsBehaviorBase(entity)
+public abstract class PhysicsBehaviorBaseVehicle : EntityBehavior
 {
     protected ICoreClientAPI capi;
     protected ICoreServerAPI sapi;
+    protected Vec3d nPos;
     protected EntityPos[] vehiclePosList;
     protected int[] subDimensionIdList;
     //private BlockyVehicleLibModSystem modSystem;
@@ -34,27 +35,35 @@ public abstract class PhysicsBehaviorBaseVehicle(Entity entity) : PhysicsBehavio
     public IMountable mountableSupplier;
 
     protected readonly EntityPos lPos = new();
-    protected Vec3d nPos;
 
     public float CollisionYExtra = 1f;
 
     [ThreadStatic]
-    protected internal static CachingVehicleCollisionTester collisionTester;
+    protected static CachingVehicleCollisionTester vCollisionTester;
 
-    static PhysicsBehaviorBaseVehicle()
+    public PhysicsBehaviorBaseVehicle(Entity entity)
+    : base(entity)
     {
-    }
-
-    public static void InitServerMT(ICoreServerAPI sapi)
-    {
-        collisionTester = new CachingVehicleCollisionTester();
-        sapi.Event.PhysicsThreadStart += () => collisionTester = new CachingVehicleCollisionTester();
     }
 
     public virtual void Initialize()
     {
-        if (entity.Api is ICoreClientAPI capi) this.capi = capi;
-        if (entity.Api is ICoreServerAPI sapi) this.sapi = sapi;
+        if (entity.Api is ICoreClientAPI capi)
+        {
+            this.capi = capi;
+        }
+
+        if (entity.Api is ICoreServerAPI sapi)
+        {
+            this.sapi = sapi;
+        }
+    }
+    
+    public static void InitServerMT(ICoreServerAPI sapi, int dummy)
+    {
+        PhysicsBehaviorBaseVehicle.vCollisionTester = new CachingVehicleCollisionTester();
+        sapi.Event.PhysicsThreadStart += (Action) (() => PhysicsBehaviorBaseVehicle.vCollisionTester = new CachingVehicleCollisionTester());
+        sapi.Logger.Event("PhysicsBehaviorBaseVehicle.InitServerMT executed successfully");
     }
 
     public override void AfterInitialized(bool onFirstSpawn)
