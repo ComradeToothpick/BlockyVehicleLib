@@ -1,8 +1,0 @@
-[
-  { 
-    "file": "game:entities/humanoid/player.json", 
-    "op": "addmerge", 
-    "path": "/behaviors", 
-    "value": [ { "name": "blockyvehiclelib.entityvehiclephysics" } ]
-  }
-]

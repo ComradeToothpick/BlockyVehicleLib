@@ -58,11 +58,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         api.Logger.Event(Mod.Info.ModID + ".vehicle");
         api.RegisterEntity(Mod.Info.ModID + ".vehicle", typeof(EntityVehicle));
         api.RegisterItemClass(Mod.Info.ModID + ".vehiclewand", typeof(ItemVehicleWand));
-        api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".basevehiclephysics", typeof(PhysicsBehaviorBaseVehicle));
         api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclephysicsmultibox", typeof(BehaviorPassivePhysicsMultiBoxVehicle));
-        api.RegisterEntityBehaviorClass("blockyvehiclelib.entityvehiclephysics", typeof(EntityBehaviorVehiclePhysics));
-        api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclephysics", typeof(VehicleBehaviourVehiclePhysics));
-        //api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclephysicsbehavior", typeof(BVLBehaviorVehiclePhysics));
         api.Network
             .RegisterChannel("VehicleNetworkApi")
             .RegisterMessageType<DimensionIndexRequest>()

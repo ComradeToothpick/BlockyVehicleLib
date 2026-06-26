@@ -4,7 +4,6 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using BlockyVehicleLib.Network;
-using BlockyVehicleLib.Util;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -31,7 +30,6 @@ public class EntityVehicle : EntityChunky
     public Quaternion AngVelocity = new  Quaternion();
     public double[] angVelocity = new double[4];
     public bool spawned = false;
-    public PsuedoCuboidd selectionBox = new PsuedoCuboidd();
     public List<Cuboidf> OrigCollisionBox = new List<Cuboidf>();
     private BlockPos minPos = new BlockPos(1);
     private BlockPos maxPos = new BlockPos(1);

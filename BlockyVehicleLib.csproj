@@ -62,4 +62,26 @@
       <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Remove="Entities\PhysicsBehaviorBaseVehicle.cs" />
+      <Compile Remove="Entities\PModuleVehicle.cs" />
+      <Compile Remove="Entities\VehicleCollisionTester.cs" />
+      <Compile Remove="Entities\EntityBehaviorVehiclePhysics.cs" />
+      <Compile Remove="Entities\EntityControlledVehiclePhysics.cs" />
+      <Compile Remove="Entities\EntityBehaviorPlayerVehiclePhysics.cs" />
+      <Compile Remove="Entities\BVLBehaviorVehiclePhysics.cs" />
+      <Compile Remove="Util\**" />
+      <Compile Remove="Renderer\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="Util\**" />
+      <EmbeddedResource Remove="Renderer\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Util\**" />
+      <None Remove="Renderer\**" />
+    </ItemGroup>
+
 </Project>
