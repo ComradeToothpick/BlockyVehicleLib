@@ -2,18 +2,25 @@
   "code": "vehicle",
   "class": "blockyvehiclelib.vehicle",
   "hitboxSize": { "x": 1, "y": 1 },
+  "shape": {"base": "vehicle"},
   "client": {
     "renderer": "Dummy",
     "behaviors": [
       {
-        "code": "passivephysics"
+        "code": "blockyvehiclelib.vehiclephysicsmultibox"
+      },
+      {
+        "code": "dynamic-physics"
       }
     ]
   },
   "server": {
     "behaviors": [
       {
-        "code": "passivephysics"
+        "code": "blockyvehiclelib.vehiclephysicsmultibox"
+      },
+      {
+        "code": "dynamic-physics"
       }
     ]
   },

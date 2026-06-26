@@ -540,7 +540,7 @@ namespace BlockyVehicleLib.Util
             //I'll need to completely redo these functions as the Cuboidd version this is based on could assume the cuboid was aligned with the grid
             //this might just draw a cube aligned with the grid around the cuboid
             direction = EnumPushDirection.None;
-            
+            if (from.externalCornersDirty) from.GetExternalCorners();
             if (from.Z2 > this.Z1 && from.Z1 < this.Z2 && from.Y2 > this.Y1 && from.Y1 < this.Y2)
             {
                 if (motx > 0.0 && from.X2 <= this.X1 && this.X1 - from.X2 < motx)

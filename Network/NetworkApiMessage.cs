@@ -78,4 +78,13 @@ namespace BlockyVehicleLib.Network
         [ProtoMember(5)]
         public ushort[] QuadHeights;
     }
+
+    [ProtoContract]
+    public class VehicleBlocks
+    {
+        [ProtoMember(1)] public required int[] blockIds;
+        [ProtoMember(2)] public required BlockPos[] localPos;
+        [ProtoMember(3)] public required int dimId;
+        [ProtoMember(4)] public required long entityId;
+    }
 }

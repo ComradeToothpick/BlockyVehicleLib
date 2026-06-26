@@ -46,6 +46,8 @@ public abstract class PhysicsBehaviorBaseVehicle : EntityBehavior
     {
     }
 
+    public virtual void Init() => Initialize();
+    
     public virtual void Initialize()
     {
         if (entity.Api is ICoreClientAPI capi)

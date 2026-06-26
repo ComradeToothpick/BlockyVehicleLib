@@ -46,6 +46,7 @@ namespace BlockyVehicleLib.Entities
         readonly BlockPos blockPos = new(Dimensions.WillSetLater);
         readonly Vec3d blockPosVec = new();
         readonly BlockPos collBlockPos = new(Dimensions.WillSetLater);
+        private ICoreAPI api;
 
         /// <summary>
         /// Takes the entity positiona and motion and adds them, respecting any colliding blocks. The resulting new position is put into outposition
@@ -59,6 +60,10 @@ namespace BlockyVehicleLib.Entities
         public void ApplyTerrainCollision(Entity entity, EntityPos entityPos,
             float dtFactor, ref Vec3d newPosition, float stepHeight = 1, float yExtra = 1)
         {
+            if (this.api == null)
+            {
+                this.api = entity.Api;
+            }
             minPos.SetDimension(entityPos.Dimension);
 
             var worldAccessor = entity.World;
@@ -239,6 +244,10 @@ namespace BlockyVehicleLib.Entities
             float stepHeight = 1f,
             float yExtra = 1f)
         {
+            if (this.api == null)
+            {
+                this.api = entity.Api;
+            }
             EntityPos convPos;
             this.minPos.SetDimension(entityPos.Dimension);
             var worldAccessor = entity.World;
@@ -249,150 +258,209 @@ namespace BlockyVehicleLib.Entities
             pos.X = entityPos.X;
             pos.Y = entityPos.Y;
             pos.Z = entityPos.Z;
+
+            Vec3d finalMotion = entityPos.Motion * dtFactor;
             
             EnumPushDirection pushDirection = EnumPushDirection.None;
             
             entityBox.SetAndTranslate(entity.CollisionBox, pos.X, pos.Y, pos.Z);
-
-            double motionX = entityPos.Motion.X * dtFactor;
-            double motionY = entityPos.Motion.Y * dtFactor;
-            double motionZ = entityPos.Motion.Z * dtFactor;
-
-            // We need to make sure that rounding errors do not place us inside a block, because once inside a block, this algorithm no longer pushes the entity out of it
-            // So lets collide with blocks a tiny bit earlier - i.e. by the amount of rounding error. In other words, lets push out the entity out of collision boxes once he gets within epsilon meters instead of 0 meters,
-            // so that the position+motion addition at the end of the method never ends up being inside a block
-
-            // A double value has ~15 digits. Our max map size of 64mil means we need 8 digits for the non-fractional part, leaving us with 7 digits for the fraction - so the rounding error is on the 8th digit
-            // But for some reason we still clip through blocks if we use an epsilon that is less than 0.0001. Not sure why.
-            double epsilon = 0.0001;
-            double motEpsX = 0, motEpsY = 0, motEpsZ = 0;
-            if (motionX > epsilon) motEpsX = epsilon;
-            if (motionX < -epsilon) motEpsX = -epsilon;
-
-            if (motionY > epsilon) motEpsY = epsilon;
-            if (motionY < -epsilon) motEpsY = -epsilon;
-
-            if (motionZ > epsilon) motEpsZ = epsilon;
-            if (motionZ < -epsilon) motEpsZ = -epsilon;
-
-            // We pretend we are by epsilon meters further and push the entity out of it
-            // but at the end of the method we do not add this epsilon to the final position
-            motionX += motEpsX;
-            motionY += motEpsY;
-            motionZ += motEpsZ;
-            
-            this.GenerateCollisionBoxList(worldAccessor.BlockAccessor, motionX, motionY, motionZ, stepHeight, yExtra,
+            this.GenerateCollisionBoxList(worldAccessor.BlockAccessor, finalMotion.X, finalMotion.Y, finalMotion.Z, stepHeight, yExtra,
                 entityPos.Dimension, entityPos, subDimensionId, entityVehiclePosList);
-            
             bool collided = false;
-
             int collisionBoxListCount = CollisionBoxList.Count;
             Cuboidd[] CollisionBoxListCuboids = CollisionBoxList.cuboids; // Local reference for efficiency
-            //CollisionBoxListCuboids.Append<Cuboidd>(CollisionBoxList2.cuboids);
-            double preCollisionMotionY = motionY;
-            collBlockPos.SetDimension(entityPos.Dimension);
             // ---------- Y COLLISION. Call events and set collided vertically.
-            for (int i = 0; i < CollisionBoxListCuboids.Length; i++)
+            for (int j = 0; j < entityVehiclePosList.Length; j ++) 
             {
-                if (i >= collisionBoxListCount) break;
-                motionY = CollisionBoxListCuboids[i].pushOutY(entityBox, motionY, ref pushDirection);
-                if (pushDirection == EnumPushDirection.None) continue;
+                double motionX = finalMotion.X;
+                double motionY = finalMotion.Y;
+                double motionZ = finalMotion.Z;
+                double epsilon = 0.0001;
+                double motEpsX = 0, motEpsY = 0, motEpsZ = 0;
+            
+                // We need to make sure that rounding errors do not place us inside a block, because once inside a block, this algorithm no longer pushes the entity out of it
+                // So lets collide with blocks a tiny bit earlier - i.e. by the amount of rounding error. In other words, lets push out the entity out of collision boxes once he gets within epsilon meters instead of 0 meters,
+                // so that the position+motion addition at the end of the method never ends up being inside a block
 
-                collided = true;
+                // A double value has ~15 digits. Our max map size of 64mil means we need 8 digits for the non-fractional part, leaving us with 7 digits for the fraction - so the rounding error is on the 8th digit
+                // But for some reason we still clip through blocks if we use an epsilon that is less than 0.0001. Not sure why.
+            
 
-                collBlockPos.Set(CollisionBoxList.positions[i]);
-                CollisionBoxList.blocks[i].OnEntityCollide(
-                    worldAccessor,
-                    entity,
-                    collBlockPos,
-                    pushDirection == EnumPushDirection.Negative ? BlockFacing.UP : BlockFacing.DOWN,
-                    tmpPosDelta.Set(motionX, motionY, motionZ),
-                    !entity.CollidedVertically
-                );
-            }
-
-            entityBox.Translate(0, motionY, 0);
-
-            entity.CollidedVertically = collided;
-            if (collided && Math.Abs(motionY - preCollisionMotionY) > epsilon)
-                motionY += motEpsY; // Add back the epsilon, because it has gone as a result of the pushOutY call
-
-            // Check if horizontal collision is possible.
-            bool horizontallyBlocked = false;
-            entityBox.Translate(motionX, 0, motionZ);
-            foreach (var cuboid in CollisionBoxList)
-            {
-                if (cuboid.Intersects(entityBox))
+                // We pretend we are by epsilon meters further and push the entity out of it
+                // but at the end of the method we do not add this epsilon to the final position
+                
+                double preCollisionMotionY = motionY;
+                for (int i = 0; i < CollisionBoxListCuboids.Length; i++)//I suspect this could get quite laggy with more than a few vehicles nearby, perhaps some matrix maths could help here down the line?
                 {
-                    horizontallyBlocked = true;
-                    break;
-                }
-            }
+                    //CollisionBoxListCuboids.Append<Cuboidd>(CollisionBoxList2.cuboids);
+                    collBlockPos.SetDimension(entityPos.Dimension);
+                    if (collisionBoxListCount == 0) break;
+                    EntityPos vehiclePos = entityVehiclePosList[j];
+                    Vec3d relVel = FindRelativeVelocity(entityPos, vehiclePos);
+                    EntityPos relPos = FindRelativeEntityPosition(entity.Pos, vehiclePos);
+                
+                    relPos.Motion.X = relVel.X * dtFactor;
+                    relPos.Motion.Y = relVel.Y * dtFactor;
+                    relPos.Motion.Z = relVel.Z * dtFactor;
+                
+                    motEpsX = 0;
+                    motEpsY = 0;
+                    motEpsZ = 0;
+                
+                    if (relVel.X > epsilon) motEpsX = epsilon;
+                    if (relVel.X < -epsilon) motEpsX = -epsilon;
+                
+                    if (relVel.Y > epsilon) motEpsY = epsilon;
+                    if (relVel.Y < -epsilon) motEpsY = -epsilon;
+                
+                    if (relVel.Z > epsilon) motEpsZ = epsilon;
+                    if (relVel.Z < -epsilon) motEpsZ = -epsilon;
+                
+                    relVel.X += motEpsX;
+                    relVel.Y += motEpsY;
+                    relVel.Z += motEpsZ;
+                
+                    Quaterniond temp = new Quaterniond(); //Why is this not static? It should be static!
+                    PsuedoCuboidd tempBox = this.sudoBox; //Local reference for efficiency
 
-            entityBox.Translate(-motionX, 0, -motionZ); // cheaper than creating a new Cuboidd
+                    tempBox.rotation = temp.Conjugate(new double[4],
+                        PsuedoCuboidd.ConvertEulerAngles(vehiclePos.Pitch, vehiclePos.Yaw, vehiclePos.Roll));
+                    tempBox.pos.X = relPos.X +
+                                    (int)(subDimensionId[j] % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/);
+                    tempBox.pos.Y = relPos.Y + 8192;
+                    tempBox.pos.Z = relPos.Z +
+                                    (int)(subDimensionId[j] / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/);
 
-            // No collisions for the entity found when testing horizontally, so skip this.
-            // This allows entities to move around corners without falling down on a certain axis.
-            collided = false;
-            if (horizontallyBlocked)
-            {
-                // X - Collision (Horizontal)
-                for (int i = 0; i < CollisionBoxListCuboids.Length; i++)
-                {
-                    if (i >= collisionBoxListCount) break;
-                    motionX = CollisionBoxListCuboids[i].pushOutX(entityBox, motionX, ref pushDirection);
+                    tempBox.size.X = entity.CollisionBox.Width;
+                    tempBox.size.Y = entity.CollisionBox.Height;
+                    tempBox.size.Z = entity.CollisionBox.Length;
+                
+                    tempBox.SetInternalCorners();
+                    tempBox.GetExternalCorners();
+                
+                    motionY = tempBox.pushOutY(entityBox, motionY, ref pushDirection);
                     if (pushDirection == EnumPushDirection.None) continue;
-
+                
                     collided = true;
-
+                
                     collBlockPos.Set(CollisionBoxList.positions[i]);
                     CollisionBoxList.blocks[i].OnEntityCollide(
                         worldAccessor,
                         entity,
                         collBlockPos,
-                        pushDirection == EnumPushDirection.Negative ? BlockFacing.EAST : BlockFacing.WEST,
+                        pushDirection == EnumPushDirection.Negative ? BlockFacing.UP : BlockFacing.DOWN,
                         tmpPosDelta.Set(motionX, motionY, motionZ),
-                        !entity.CollidedHorizontally
+                        !entity.CollidedVertically
                     );
-                }
+                    entityBox.Translate(0, motionY, 0);
 
-                entityBox.Translate(motionX, 0, 0);
+                    entity.CollidedVertically = collided;
+                    if (collided && Math.Abs(motionY - preCollisionMotionY) > epsilon)
+                        motionY += motEpsY; // Add back the epsilon, because it has gone as a result of the pushOutY call
 
-                // Z - Collision (Horizontal)
+                    // Check if horizontal collision is possible.
+                    bool horizontallyBlocked = false;
+                    entityBox.Translate(motionX, 0, motionZ);
+                    foreach (var cuboid in CollisionBoxList)
+                    {
+                        if (cuboid.Intersects(entityBox))
+                        {
+                            horizontallyBlocked = true;
+                            break;
+                        }
+                    }
 
-                for (int i = 0; i < CollisionBoxListCuboids.Length; i++)
-                {
-                    if (i >= collisionBoxListCount) break;
-                    motionZ = CollisionBoxListCuboids[i].pushOutZ(entityBox, motionZ, ref pushDirection);
-                    if (pushDirection == EnumPushDirection.None) continue;
+                    entityBox.Translate(-motionX, 0, -motionZ); // cheaper than creating a new Cuboidd
 
-                    collided = true;
+                    // No collisions for the entity found when testing horizontally, so skip this.
+                    // This allows entities to move around corners without falling down on a certain axis.
+                    collided = false;
+                    if (horizontallyBlocked)
+                    {
+                        // X - Collision (Horizontal)
+                        for (int k = 0; k < CollisionBoxListCuboids.Length; k++)
+                        {
+                            if (k >= collisionBoxListCount) break;
+                            motionX = CollisionBoxListCuboids[k].pushOutX(entityBox, motionX, ref pushDirection);
+                            if (pushDirection == EnumPushDirection.None) continue;
 
-                    collBlockPos.Set(CollisionBoxList.positions[i]);
-                    CollisionBoxList.blocks[i].OnEntityCollide(
-                        worldAccessor,
-                        entity,
-                        collBlockPos,
-                        pushDirection == EnumPushDirection.Negative ? BlockFacing.SOUTH : BlockFacing.NORTH,
-                        tmpPosDelta.Set(motionX, motionY, motionZ),
-                        !entity.CollidedHorizontally
-                    );
+                            collided = true;
+
+                            collBlockPos.Set(CollisionBoxList.positions[k]);
+                            CollisionBoxList.blocks[k].OnEntityCollide(
+                                worldAccessor,
+                                entity,
+                                collBlockPos,
+                                pushDirection == EnumPushDirection.Negative ? BlockFacing.EAST : BlockFacing.WEST,
+                                tmpPosDelta.Set(motionX, motionY, motionZ),
+                                !entity.CollidedHorizontally
+                            );
+                        }
+
+                        entityBox.Translate(motionX, 0, 0);
+
+                        // Z - Collision (Horizontal)
+
+                        for (int k = 0; k < CollisionBoxListCuboids.Length; k++)
+                        {
+                            if (k >= collisionBoxListCount) break;
+                            motionZ = CollisionBoxListCuboids[k].pushOutZ(entityBox, motionZ, ref pushDirection);
+                            if (pushDirection == EnumPushDirection.None) continue;
+
+                            collided = true;
+
+                            collBlockPos.Set(CollisionBoxList.positions[k]);
+                            CollisionBoxList.blocks[k].OnEntityCollide(
+                                worldAccessor,
+                                entity,
+                                collBlockPos,
+                                pushDirection == EnumPushDirection.Negative ? BlockFacing.SOUTH : BlockFacing.NORTH,
+                                tmpPosDelta.Set(motionX, motionY, motionZ),
+                                !entity.CollidedHorizontally
+                            );
+                        }
+                    }
+                    
+                    
+                    entity.CollidedHorizontally = collided;
+
+                    // fix for player on ladder clipping into block above issue  (caused by the .CollisionBox not always having height precisely 1.85)
+                    if (motionY > 0 && entity.CollidedVertically)
+                    {
+                        motionY -= entity.LadderFixDelta;
+                    }
+
+                    motionX -= motEpsX;
+                    motionY -= motEpsY;
+                    motionZ -= motEpsZ;
+
+                    if (motionX < 0)
+                    {
+                        finalMotion.X = Math.Max(motionX, finalMotion.X);
+                    }
+                    if (motionX >= 0)
+                    {
+                        finalMotion.X = Math.Min(motionX, finalMotion.X);
+                    }
+                    if (motionY < 0)
+                    {
+                        finalMotion.Y = Math.Max(motionY, finalMotion.Y);
+                    }
+                    if (motionY >= 0)
+                    {
+                        finalMotion.Y = Math.Min(motionY, finalMotion.Y);
+                    }
+                    if (motionZ < 0)
+                    {
+                        finalMotion.Z = Math.Max(motionZ, finalMotion.Z);
+                    }
+                    if (motionZ >= 0)
+                    {
+                        finalMotion.Z = Math.Min(motionZ, finalMotion.Z);
+                    }
                 }
             }
-
-            entity.CollidedHorizontally = collided;
-
-            // fix for player on ladder clipping into block above issue  (caused by the .CollisionBox not always having height precisely 1.85)
-            if (motionY > 0 && entity.CollidedVertically)
-            {
-                motionY -= entity.LadderFixDelta;
-            }
-
-            motionX -= motEpsX;
-            motionY -= motEpsY;
-            motionZ -= motEpsZ;
-
-            newPosition.Set(pos.X + motionX, pos.Y + motionY, pos.Z + motionZ);
+            newPosition.Set(pos.X + finalMotion.X, pos.Y + finalMotion.Y, pos.Z + finalMotion.Z);
         }
 
         /*protected virtual void GenerateCollisionBoxList(
@@ -463,7 +531,7 @@ namespace BlockyVehicleLib.Entities
             }, true);
         }
 
-        //May need to completely redo this
+        //Need to completely redo this
         protected virtual void GenerateCollisionBoxList(
             IBlockAccessor blockAccessor,
             double motionX,
@@ -477,50 +545,38 @@ namespace BlockyVehicleLib.Entities
             EntityPos[] entityPosList
         )
         {
-            int num1 = this.minPos.SetAndEquals((int)(this.entityBox.X1 + Math.Min(0.0, motionX)),
-                (int)(this.entityBox.Y1 + Math.Min(0.0, motionY) - (double)yExtra),
-                (int)(this.entityBox.Z1 + Math.Min(0.0, motionZ)))
-                ? 1
-                : 0;
-            double num2 = Math.Max(this.entityBox.Y1 + (double)stepHeight, this.entityBox.Y2);
-            int num3 = this.maxPos.SetAndEquals((int)(this.entityBox.X2 + Math.Max(0.0, motionX)),
-                (int)(num2 + Math.Max(0.0, motionY)), (int)(this.entityBox.Z2 + Math.Max(0.0, motionZ)))
-                ? 1
-                : 0;
-            if ((num1 & num3) != 0)
-                return;
-            this.CollisionBoxList.Clear();
-            blockAccessor.WalkBlocks(this.minPos, this.maxPos, (Action<Block, int, int, int>)((block, x, y, z) =>
+            EntityPos baseEntityPos = new EntityPos(0, 0, 0);
+            baseEntityPos.Motion.X = motionX;
+            baseEntityPos.Motion.Y = motionY;
+            baseEntityPos.Motion.Z = motionZ;
+            Vec3d[] entityVec1List = FindRelativePosition(entityPosList, new Vec3d(this.entityBox.X1, this.entityBox.Y1, this.entityBox.Z1));
+            Vec3d[] entityVec2List = FindRelativePosition(entityPosList, new Vec3d(this.entityBox.X2, this.entityBox.Y2, this.entityBox.Z2));
+            for (int i = 0; i < subDimensionId.Length; i++)
             {
-
-                Cuboidf[] collisionBoxes = block.GetCollisionBoxes(blockAccessor, this.tmpPos.Set(x, y, z));
-                if (collisionBoxes != null) this.CollisionBoxList.Add(collisionBoxes, x, y, z, block);
-                Cuboidf[] collisionBoxes2;
-                this.tmpPos.dimension = 1;
-                Vec3d[] entityVecList = FindRelativePosition(entityPosList, new Vec3d(x, y, z));
-                for (int i = 0; i < subDimensionId.Length; i++)
+                Vec3d relativeMotion = FindRelativeVelocity(entityPos, entityPosList[i]);
+                int num1 = this.minPos.SetAndEquals((int)(entityVec1List[i].X + Math.Min(0.0, relativeMotion.X) + (int)(subDimensionId[i] % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/)),
+                    (int)(entityVec1List[i].Y + Math.Min(0.0, relativeMotion.Y) - (double)yExtra + 8192 /*0x2000*/),
+                    (int)(entityVec1List[i].Z + Math.Min(0.0, relativeMotion.Z) + (int)(subDimensionId[i] / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/)))
+                    ? 1
+                    : 0;
+                double num2 = Math.Max(entityVec1List[i].Y + (double)stepHeight, entityVec2List[i].Y);
+                int num3 = this.maxPos.SetAndEquals((int)(entityVec2List[i].X + Math.Max(0.0, relativeMotion.X) + (int)(subDimensionId[i] % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/)),
+                    (int)(num2 + Math.Max(0.0, relativeMotion.Y) + 8192 /*0x2000*/), (int)(entityVec2List[i].Z + Math.Max(0.0, relativeMotion.Z) + (int)(subDimensionId[i] / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/)))
+                    ? 1
+                    : 0;
+                if ((num1 & num3) != 0)
+                    return;
+                this.CollisionBoxList.Clear();
+                blockAccessor.WalkBlocks(this.minPos, this.maxPos, (Action<Block, int, int, int>)((block, x, y, z) =>
                 {
-                    entityVecList[i].X +=
-                        (int)(subDimensionId[i] % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/);
-                    double tmpX = entityVecList[i].X;
-                    entityVecList[i].Y += 8192 /*0x2000*/;
-                    double tmpY = entityVecList[i].Y;
-                    entityVecList[i].Z +=
-                        (int)(subDimensionId[i] / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/);
-                    double tmpZ = entityVecList[i].Z;
-
-                    collisionBoxes2 = block.GetCollisionBoxes(blockAccessor, this.tmpPos.Set(tmpX, tmpY, tmpZ));
-                    if (collisionBoxes2 != null) this.CollisionBoxList.Add(collisionBoxes2, x, y, z, block);
-                    this.tmpPos.X -= subDimensionId[i] % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-                    this.tmpPos.Y -= 8192 /*0x2000*/;
-                    this.tmpPos.Z -= subDimensionId[i] / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-                }
-                
-
-                this.tmpPos.dimension = dimension;
-
-                if (collisionBoxes == null) return;
-            }), true);
+                    Cuboidf[] collisionBoxes = block.GetCollisionBoxes(blockAccessor, this.tmpPos.Set(x, y, z));
+                    if (collisionBoxes != null) this.CollisionBoxList.Add(collisionBoxes, x, y, z, block);
+                    api.Logger.Event("Collision box list generated: " + CollisionBoxList.Count + " Collision boxes added.");
+                    this.tmpPos.dimension = dimension;
+                    
+                    if (collisionBoxes == null) return;
+                }), true);
+            }
         }
 
         /// <summary>
@@ -531,17 +587,17 @@ namespace BlockyVehicleLib.Entities
         /// <param name="pos"></param>
         /// <param name="alsoCheckTouch"></param>
         /// <returns></returns>
-        public bool IsColliding(IBlockAccessor blockAccessor, Cuboidf entityBoxRel, Vec3d pos,
+        public bool IsColliding(IBlockAccessor blockAccessor, PsuedoCuboidd entityBoxRel, Vec3d pos,
             bool alsoCheckTouch = true)
         {
             return GetCollidingBlock(blockAccessor, entityBoxRel, pos, alsoCheckTouch) != null;
         }
         
-        /*
-        public Block GetCollidingBlock(IBlockAccessor blockAccessor, Cuboidf entityBoxRel, Vec3d pos,
+        
+        new public Block GetCollidingBlock(IBlockAccessor blockAccessor, PsuedoCuboidd entityBoxRel, Vec3d pos,
             bool alsoCheckTouch = true)
         {
-            Cuboidd entityBox = tmpBox.SetAndTranslate(entityBoxRel, pos);
+            PsuedoCuboidd entityBox = sudoBox.SetAndTranslate(entityBoxRel, pos);
 
             int minX = (int)entityBox.X1;
             int minY = (int)entityBox.Y1 - 1; // -1 for the extra high collision box of fences.
@@ -551,8 +607,8 @@ namespace BlockyVehicleLib.Entities
             int maxY = (int)entityBox.Y2;
             int maxZ = (int)entityBox.Z2;
 
-            entityBox.Y1 =
-                Math.Round(entityBox.Y1,
+            entityBox.pos.Y =
+                Math.Round(entityBox.pos.Y,
                     5); // Fix float/double rounding errors. Only need to fix the vertical because gravity.
 
             BlockPos blockPos = this.blockPos; // Local reference for efficiency
@@ -589,7 +645,7 @@ namespace BlockyVehicleLib.Entities
             }
             return null;
         }
-        */
+        
         
         public bool IsCollidingVehicle(IBlockAccessor blockAccessor, Cuboidf entityBoxRel, Vec3d pos, EntityVehicle[] nearbyVehicles,
             bool alsoCheckTouch = true)
@@ -901,7 +957,8 @@ namespace BlockyVehicleLib.Entities
             {
                 relativePos[i] = new Vec3d();
                 double[] rotation = PsuedoCuboidd.ConvertEulerAngles(VehiclePosList[i].Pitch, VehiclePosList[i].Yaw, VehiclePosList[i].Roll);
-                double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], 1];
+                Quaterniond.Normalize(rotation, rotation);
+                double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], rotation[3]];
                 double[] qPos = [pos.X, pos.Y, pos.Z, 0];
                 Quaterniond.Multiply(rotation, rotation, qPos);
                 Quaterniond.Multiply(rotation, rotation, rotStar);
@@ -917,7 +974,8 @@ namespace BlockyVehicleLib.Entities
             Vec3d relativePos = new Vec3d();
             
             double[] rotation = PsuedoCuboidd.ConvertEulerAngles(VehiclePos.Pitch, VehiclePos.Yaw, VehiclePos.Roll);
-            double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], 1];
+            Quaterniond.Normalize(rotation, rotation);
+            double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], rotation[3]];
             double[] qPos = [entityPos.X, entityPos.Y, entityPos.Z, 0];
             Quaterniond.Multiply(rotation, rotation, qPos);
             Quaterniond.Multiply(rotation, rotation, rotStar);
@@ -935,6 +993,7 @@ namespace BlockyVehicleLib.Entities
             EntityPos relativePos = new EntityPos();
             
             double[] rotation = PsuedoCuboidd.ConvertEulerAngles(VehiclePos.Pitch, VehiclePos.Yaw, VehiclePos.Roll);
+            Quaterniond.Normalize(rotation, rotation);
             double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], rotation[3]];
             double[] qPos = [entityPos.X, entityPos.Y, entityPos.Z, 0];
             Quaterniond.Multiply(rotation, rotation, qPos);
@@ -959,7 +1018,8 @@ namespace BlockyVehicleLib.Entities
             for (int i = 0; i < VehicleList.Length; i++)
             {
                 double[] rotation = PsuedoCuboidd.ConvertEulerAngles(VehicleList[i].Pos.Pitch, VehicleList[i].Pos.Yaw, VehicleList[i].Pos.Roll);
-                double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], 1];
+                Quaterniond.Normalize(rotation, rotation);
+                double[] rotStar = [-rotation[0], -rotation[1], -rotation[2], rotation[3]];
                 double[] qPos = [pos.X, pos.Y, pos.Z, 0];
                 Quaterniond.Multiply(rotation, rotation, qPos);
                 Quaterniond.Multiply(rotation, rotation, rotStar);
@@ -974,9 +1034,18 @@ namespace BlockyVehicleLib.Entities
         {
             EntityPos tempA = entityPosA.Copy();
             EntityPos tempB = entityPosB.Copy();
-            tempA.Motion.X -= tempB.Motion.X;
-            tempA.Motion.Y -= tempB.Motion.Y;
-            tempA.Motion.Z -= tempB.Motion.Z;
+            //double[] rotA = PsuedoCuboidd.ConvertEulerAngles(tempA.Pitch, tempA.Yaw, tempA.Roll);
+            double[] rot = PsuedoCuboidd.ConvertEulerAngles(tempB.Pitch, tempB.Yaw, tempB.Roll);
+            Quaterniond.Normalize(rot, rot);
+            double[] rotStar =  [-rot[0], -rot[1], -rot[2], rot[3]];
+            double[] motion = [tempA.Motion.X, tempA.Motion.Y, tempA.Motion.Z, 0];
+
+            Quaterniond.Multiply(motion, rot, motion);
+            Quaterniond.Multiply(motion, motion, rotStar);
+            
+            tempA.Motion.X = motion[0] - tempB.Motion.X;
+            tempA.Motion.Y = motion[1] - tempB.Motion.Y;
+            tempA.Motion.Z = motion[2] - tempB.Motion.Z;
             return tempA.Motion;
         }
 

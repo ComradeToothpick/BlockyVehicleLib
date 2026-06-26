@@ -6,9 +6,13 @@
     "authors": [
         "Comrade_Toothpik"
     ],
+    "contributors": [
+        "Davis99"
+    ],
     "description": "Library for making block based vehicles.",
     "version": "1.0.0",
     "dependencies": {
-        "game": "1.22.0"
+        "game": "1.22.1",
+        "physicslib": "1.3.0"
     }
 }
