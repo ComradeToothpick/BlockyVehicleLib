@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using System;
+using HarmonyLib;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -233,17 +234,11 @@ public class BlockyVehicleLibModSystem : ModSystem
         }
         
         dim.SetSubDimensionId(message.dimensionIndex);
-        BlockPos pos2 = new BlockPos(new Vec3i(0, 0, 0), 1);
+        BlockPos dimPos = new BlockPos(new Vec3i(0, 0, 0), 1);
         //pos.Sub(message.blockSel.Position);
         //pos.SetDimension(1);
-        pos2.X +=
-            (int)(message.dimensionIndex % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/);
-        
-        pos2.Y += 8192 /*0x2000*/;
-        
-        pos2.Z +=
-            (int)(message.dimensionIndex / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/);
-        BlockPos localOrigin = pos2.CopyAndCorrectDimension();
+        dim.AdjustPosForSubDimension(ref dimPos);
+        BlockPos localOrigin = dimPos.CopyAndCorrectDimension();
         dim.ClearChunks();
         //create the entity and associate it with the minidimension
         //or find the entity if it already exists and move it.
@@ -269,21 +264,28 @@ public class BlockyVehicleLibModSystem : ModSystem
         int blockId = message.blockId;
         int[] blockIds = new int[20];
         BlockPos[] localPos = new BlockPos[20];
+        int maxX = 0; int maxY = 0; int maxZ = 0;
         for (int i = 0; i < 10; i++)//Staircase formation
         {
-            dim.SetBlock(blockId, pos2, BlockLayersAccess.Solid);
-            blockIds[2 * i] = dim.GetBlock(pos2).BlockId;
-            localPos[2 * i] = pos2 - localOrigin;
-            pos2.X += 1;
-            dim.SetBlock(blockId, pos2, BlockLayersAccess.Solid);
-            blockIds[2 * i + 1] = dim.GetBlock(pos2).BlockId;
-            localPos[2 * i + 1] = pos2 -  localOrigin;
-            pos2.Y += 1;
+            dim.SetBlock(blockId, dimPos, new ItemStack());
+            blockIds[2 * i] = dim.GetBlock(dimPos).BlockId;
+            localPos[2 * i] = dimPos - localOrigin;
+            maxX = Math.Max(maxX, localPos[2 * i].X);
+            maxY = Math.Max(maxY, localPos[2 * i].Y);
+            maxZ = Math.Max(maxZ, localPos[2 * i].Z);
+            dimPos.X += 1;
+            dim.SetBlock(blockId, dimPos, new ItemStack());
+            blockIds[2 * i + 1] = dim.GetBlock(dimPos).BlockId;
+            localPos[2 * i + 1] = dimPos -  localOrigin;
+            maxX = Math.Max(maxX, localPos[2 * i + 1].X);
+            maxY = Math.Max(maxY, localPos[2 * i + 1].Y);
+            maxZ = Math.Max(maxZ, localPos[2 * i + 1].Z);
+            dimPos.Y += 1;
         }
-        dim.RecalculateCenterOfMass(api.World);
+        //dim.RecalculateCenterOfMass(api.World);
         //Send relevant information to the client side to build the colliders
         serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId}, (IServerPlayer) player);
-        api.Logger.Event("Block ID: " + dim.GetBlockId(pos2));
+        api.Logger.Event("Block ID: " + dim.GetBlockId(dimPos));
         //sapi.World.BlockAccessor.SetBlock(blockId, pos2, 0);
         //dim.UnloadUnusedServerChunks();
         
@@ -327,10 +329,31 @@ public class BlockyVehicleLibModSystem : ModSystem
         return (T)val;
     }*/
 
+    public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos pos2, BlockPos localOrigin)
+    {
+        
+        int[] blockIds = new int[20];
+        BlockPos[] localPos = new BlockPos[20];
+        IWorldChunk chunk;
+        for (int i = 0; i < 10; i++)//Staircase formation
+        {
+            chunk = dim.GetChunkAtBlockPos(pos2);
+            dim.CallSetSolidBlock(blockId, pos2, chunk, new ItemStack());
+            blockIds[2 * i] = dim.GetBlock(pos2).BlockId;
+            localPos[2 * i] = pos2 - localOrigin;
+            pos2.X += 1;
+            chunk = dim.GetChunkAtBlockPos(pos2);
+            dim.CallSetSolidBlock(blockId, pos2, chunk, new ItemStack());
+            blockIds[2 * i + 1] = dim.GetBlock(pos2).BlockId;
+            localPos[2 * i + 1] = pos2 -  localOrigin;
+            pos2.Y += 1;
+        }
+    }
+
     public BuiltCompound? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId)
     {
         if (api.Side == EnumAppSide.Server) return null;//Only needed on client side
-        BlockAccessorMovable dim = (BlockAccessorMovable)((ICoreClientAPI)api).World.MiniDimensions[dimId];
+        BlockyVehicle dim = (BlockyVehicle)((ICoreClientAPI)api).World.MiniDimensions[dimId];
         List<ManualChildBox> boxList = new List<ManualChildBox>();
         boxList.Capacity = blockIds.Length;
         api.Logger.Event("blockIds.Length: " + blockIds.Length);
@@ -340,8 +363,8 @@ public class BlockyVehicleLibModSystem : ModSystem
             ManualChildBox box = new ManualChildBox()
             {
                 HalfExtents = new Vector3(shape.Scale/2),
-                LocalOrientation = Quaternion.CreateFromYawPitchRoll(shape.rotateY, shape.rotateX, shape.rotateZ),
-                LocalPosition = new Vector3(shape.offsetX + localPos[i].X, shape.offsetY + localPos[i].Y, shape.offsetZ + localPos[i].Z)
+                LocalOrientation = Quaternion.Identity,
+                LocalPosition = new Vector3(shape.offsetZ + localPos[i].Z + 0.5f, shape.offsetY + localPos[i].Y + 0.5f, shape.offsetX + localPos[i].X + 0.5f)//Swapping x and z to correct orientation
             };
             api.Logger.Event("Local Position: " + box.LocalPosition);
             boxList.Add(box);
@@ -373,8 +396,8 @@ public class BlockyVehicleLibModSystem : ModSystem
         capi.World.MiniDimensions[message.dimId] = dim;
         //IMiniDimension dim = capi.World.GetOrCreateDimension(message.dimId, message.vecPos);
         
-        //Vec3d newPos = message.vecPos.Add(new Vec3f(0.5f, 1.0f, 0.5f));
-        //dim.CurrentPos.SetPos(newPos);
+        Vec3d newPos = message.vecPos.Add(new Vec3f(0.5f, 1.0f, 0.5f));
+        dim.CurrentPos.SetPos(newPos);
         dim.selectionTrackingOriginalPos = message.blockPos;//Need to set this for it to render in the world
         dim.selectionTrackingOriginalPos.Y += 1;
         capi.World.SpawnEntity(EntityVehicle.CreateVehicle(capi, dim));
@@ -409,7 +432,7 @@ public class BlockyVehicleLibModSystem : ModSystem
             int dimIndex = GetMiniDimensionPlayerIndex(player);
             if (dimIndex == -1)
             {
-                IMiniDimension dim = sapi.World.BlockAccessor.CreateMiniDimension(new Vec3d(0, 0, 0));
+                BlockyVehicle dim = (BlockyVehicle) sapi.World.BlockAccessor.CreateMiniDimension(new Vec3d(0, 0, 0));
                 int index = sapi.Server.LoadMiniDimension(dim);
                 _dimensionRegistry.Add(player.PlayerUID, index);
                 /*

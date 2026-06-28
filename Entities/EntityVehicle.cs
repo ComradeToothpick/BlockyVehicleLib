@@ -25,9 +25,7 @@ public class EntityVehicle : EntityChunky
 {
     public int tickOffset = 0;
     protected int tickCounter = 0;
-    public Quaternion Qrotation = new  Quaternion();
     public double[] qRotation;
-    public Quaternion AngVelocity = new  Quaternion();
     public double[] angVelocity = new double[4];
     public bool spawned = false;
     public List<Cuboidf> OrigCollisionBox = new List<Cuboidf>();
@@ -35,6 +33,7 @@ public class EntityVehicle : EntityChunky
     private BlockPos maxPos = new BlockPos(1);
     private const int dimRadius = 8;
     private BlockPos localOrigin;
+    
 
     public EntityVehicle() : base()
     {
@@ -45,84 +44,44 @@ public class EntityVehicle : EntityChunky
         base.OnEntitySpawn();
         this.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
     }
+    
+    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockAccessorMovable dim)
+    {
+        entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
+        entity.blocks = dim;
+        entity.subDimensionIndex = entity.blocks.subDimensionId;
+        entity.Pos.SetFrom(entity.blocks.CurrentPos);
+        entity.blocks.Dirty = true;
+        entity.blocks.TrackSelection = false;
+        entity.OrigCollisionBox.Add(new Cuboidf());
+        entity.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
+        entity.angVelocity = ConvertEulerAngles(0.0f, 0.0f, 0.0f);
+        entity.angVelocity[3] = 0;
+        entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
+        entity.WatchedAttributes.SetAttribute("dim", (IAttribute) new IntAttribute(dim.subDimensionId));
+        entity.tickOffset = dim.subDimensionId % 100;
+        BlockPos blockPos = new BlockPos(1);
+        ((BlockyVehicle)entity.blocks).AdjustPosForSubDimension(ref blockPos);
+        //blockPos.X = 0 + dim.subDimensionId % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
+        //blockPos.Y = 0 + 8192 /*0x2000*/;
+        //blockPos.Z = 0 + dim.subDimensionId / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
+        entity.localOrigin = blockPos;
+        entity.minPos = new BlockPos(blockPos.X - dimRadius + 1, blockPos.Y - dimRadius + 1, blockPos.Z - dimRadius + 1, 1);
+        entity.maxPos = new BlockPos(blockPos.X + dimRadius, blockPos.Y + dimRadius, blockPos.Z + dimRadius, 1);
+        entity.spawned = true;
+        return entity;
+    }
 
     public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockAccessorMovable dim)
     {
-        EntityVehicle entity = VehicleCreateAndLinkWithDimension(sapi, dim);
-        entity.OrigCollisionBox.Add(new Cuboidf());
-        entity.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
-        entity.Qrotation = Quaternion.Identity;
-        //entity.angVelocity = PsuedoCuboidd.ConvertEulerAngles(0.1f, 0.1f, 0.1f);
-        entity.angVelocity[3] = 0;
-        entity.AngVelocity = Quaternion.Zero;
-        ((RegistryObject) entity).Code = new AssetLocation("blockyvehiclelib:vehicle");
-        entity.WatchedAttributes.SetAttribute("dim", (IAttribute) new IntAttribute(dim.subDimensionId));
-        entity.tickOffset = dim.subDimensionId % 100;
-        BlockPos blockPos = new BlockPos(1);
-        blockPos.X = 0 + dim.subDimensionId % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-        blockPos.Y = 0+ 8192 /*0x2000*/;
-        blockPos.Z = 0 + dim.subDimensionId / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-        entity.localOrigin = blockPos;
-        entity.minPos = new BlockPos(blockPos.X - dimRadius + 1, blockPos.Y - dimRadius + 1, blockPos.Z - dimRadius + 1, 1);
-        entity.maxPos = new BlockPos(blockPos.X + dimRadius, blockPos.Y + dimRadius, blockPos.Z + dimRadius, 1);
-        entity.blocks.Dirty = true;
-        entity.spawned = true;
-        return entity;
-    }
-    public static EntityVehicle VehicleCreateAndLinkWithDimension(
-        ICoreServerAPI sapi,
-        IMiniDimension dimension)
-    {
         EntityVehicle entity = (EntityVehicle) sapi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
-        entity.AssociateWithDimension(dimension);
-        return entity;
-    }
-    
-    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, IMiniDimension dim)
-    {
-        EntityVehicle entity = (EntityVehicle) capi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        entity.OrigCollisionBox.Add(new Cuboidf());
-        entity.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
-        //entity.angVelocity = PsuedoCuboidd.ConvertEulerAngles(0.1f, 0.1f, 0.1f);
-        entity.angVelocity[3] = 0;
-        ((RegistryObject) entity).Code = new AssetLocation("blockyvehiclelib:vehicle");
-        entity.WatchedAttributes.SetAttribute("dim", (IAttribute) new IntAttribute(dim.subDimensionId));
-        entity.AssociateWithDimension(dim);
-        entity.tickOffset = dim.subDimensionId % 100;
-        BlockPos blockPos = new BlockPos(1);
-        blockPos.X = 0 + dim.subDimensionId % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-        blockPos.Y = 0;//+ 8192 /*0x2000*/;
-        blockPos.Z = 0 + dim.subDimensionId / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-        entity.localOrigin = blockPos;
-        entity.minPos = new BlockPos(blockPos.X - dimRadius + 1, blockPos.Y - dimRadius + 1, blockPos.Z - dimRadius + 1, 1);
-        entity.maxPos = new BlockPos(blockPos.X + dimRadius, blockPos.Y + dimRadius, blockPos.Z + dimRadius, 1);
-        entity.blocks.Dirty = true;
-        entity.spawned = true;
-        return entity;
+        return InitializeVehicle(entity, dim);
     }
     
     public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockAccessorMovable dim)
     {
         EntityVehicle entity = (EntityVehicle) capi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        entity.OrigCollisionBox.Add(new Cuboidf());
-        entity.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
-        //entity.angVelocity = PsuedoCuboidd.ConvertEulerAngles(0.1f, 0.1f, 0.1f);
-        entity.angVelocity[3] = 0;
-        ((RegistryObject) entity).Code = new AssetLocation("blockyvehiclelib:vehicle");
-        entity.WatchedAttributes.SetAttribute("dim", (IAttribute) new IntAttribute(dim.subDimensionId));
-        entity.AssociateWithDimension(dim);
-        entity.tickOffset = dim.subDimensionId % 100;
-        BlockPos blockPos = new BlockPos(1);
-        blockPos.X = 0 + dim.subDimensionId % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-        blockPos.Y = 0 + 8192 /*0x2000*/;//WalkBlocks does not play nicely with minidimensions, probably need to harmony patch it
-        blockPos.Z = 0 + dim.subDimensionId / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
-        entity.localOrigin = blockPos;
-        entity.minPos = new BlockPos(blockPos.X - dimRadius + 1, blockPos.Y - dimRadius + 1, blockPos.Z - dimRadius + 1, 1);
-        entity.maxPos = new BlockPos(blockPos.X + dimRadius, blockPos.Y + dimRadius, blockPos.Z + dimRadius, 1);
-        entity.blocks.Dirty = true;
-        entity.spawned = true;
-        return entity;
+        return InitializeVehicle(entity, dim);
     }
 
     public static IPlayer[] GetNearbyPlayers(ICoreServerAPI sapi, EntityPos entityPos)
@@ -133,21 +92,20 @@ public class EntityVehicle : EntityChunky
     
     public override void OnGameTick(float dt)
     {
-        if (this.blocks == null || ((Entity) this).Pos == null)
-            this.Die(EnumDespawnReason.Removed, (DamageSource) null);
+        if (blocks == null || Pos == null)
+            Die(EnumDespawnReason.Removed);
         base.OnGameTick(dt);
         if (Api.Side == EnumAppSide.Server)
         {
             tickCounter++;
-            if (tickCounter % 100 == this.tickOffset)
+            if (tickCounter % 100 == tickOffset)
             {
                 UpdateBlocks();
             }
 
             if (tickCounter == 100) tickCounter = 0;
         }
-        //rotation happens around the midpoint of the +X +Z Vertical line of the cuboid
-        //would like to fix that, but low priority atm
+        
         if (spawned)
         {
             if (blocks.Dirty)
@@ -157,11 +115,15 @@ public class EntityVehicle : EntityChunky
             //Api.Logger.Event("Rotation values: "  + qRotation[0] + ", " + qRotation[1] + ", " + qRotation[2] + ", " + qRotation[3]);
             qRotation = ApplyRotation(angVelocity, qRotation, dt);
             float[] angles = Quaterniond.ToEulerAngles(qRotation);
-            this.Pos.Roll = angles[0];
-            this.Pos.Yaw = angles[1];
-            this.Pos.Pitch = angles[2];
-            //this.Pos.Motion.X = 0.01d;
-            this.blocks.CurrentPos = this.Pos;
+            //Pos.Roll = angles[0];
+            //Pos.Yaw = angles[1];
+            //Pos.Pitch = angles[2];
+            Pos.Motion.X = 0.01d;
+            //if (Pos.X > blocks.selectionTrackingOriginalPos.X + 1.5f) blocks.selectionTrackingOriginalPos.X += 1;
+            ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);
+
+
+            //this.blocks.CurrentPos = this.Pos;
             //this.blocks.CurrentPos =  this.Pos;
             //this.Pos.X += this.Pos.Motion.X * dt;
             //this.Pos.Y += this.Pos.Motion.Y * dt;
@@ -174,6 +136,11 @@ public class EntityVehicle : EntityChunky
         ((Entity) this).Pos.Pitch = (float) GameMath.Sin(((Entity) this).Pos.X % 6.3) / 5f;
         ((Entity) this).Pos.Roll = (float) GameMath.Sin(((Entity) this).Pos.X % 12.6) / 3f;
         */
+    }
+
+    public void OnPhysicsTick(float dt)
+    {
+        
     }
     
     public override void FromBytes(BinaryReader reader, bool forClient)
@@ -293,5 +260,19 @@ public class EntityVehicle : EntityChunky
         {
             if (!blocks.Dirty) return;//Recalculate the DynamicCollisionBoxes on the client side only if the miniDimension is changed
         }
+    }
+    
+    public static double[] ConvertEulerAngles(double pitch, double yaw, double roll)//I think the maths here is wrong
+    {
+        double[] output = new double[4];
+        output[0] = Math.Sin(yaw / 2) * Math.Sin(pitch / 2) * Math.Cos(roll / 2) +
+                    Math.Cos(yaw / 2) * Math.Cos(pitch / 2) * Math.Sin(roll / 2);
+        output[1] = Math.Sin(yaw / 2) * Math.Cos(pitch / 2) * Math.Cos(roll / 2) +
+                    Math.Cos(yaw / 2) * Math.Sin(pitch / 2) * Math.Sin(roll / 2);
+        output[2] = Math.Cos(yaw / 2) * Math.Sin(pitch / 2) * Math.Cos(roll / 2) -
+                    Math.Sin(yaw / 2) * Math.Cos(pitch / 2) * Math.Sin(roll / 2);
+        output[3] = Math.Cos(yaw / 2) * Math.Cos(pitch / 2) * Math.Cos(roll / 2) - 
+                    Math.Sin(yaw / 2) * Math.Sin(pitch / 2) * Math.Sin(roll / 2);
+        return output;
     }
 }
