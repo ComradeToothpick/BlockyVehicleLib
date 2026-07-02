@@ -9,7 +9,7 @@
 
     <ItemGroup>
         <Reference Include="PhysicsLib">
-            <HintPath>..\..\..\..\..\..\RiderProjects\PhysicsLib\Releases\physicslib\PhysicsLib.dll</HintPath>
+            <HintPath>..\..\..\..\..\..\RiderProjects\PhysicsLibDavis99\Releases\physicslib\PhysicsLib.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="VintagestoryAPI">

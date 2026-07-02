@@ -170,7 +170,8 @@ public class BlockyVehicleLibModSystem : ModSystem
         BlockPos[] localPos = message.localPos;
         int dimId = message.dimId;
         long entityId = message.entityId;
-        BuiltCompound? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId);
+        Vec3d CoM = message.CoM;
+        CompoundCollider? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId, CoM);
         if (cachedShapes == null)
         {
             api.Logger.Event("Vehicle collider construction failed!");
@@ -209,6 +210,11 @@ public class BlockyVehicleLibModSystem : ModSystem
         bool loadedDim = false;
         //set the loaded minidimension to the correct index (should be unnecessary in current state, but will keep for future proofing)
         BlockPos pos = message.blockSel.Position.Copy();
+        /*Block b = message.blockSel.Block;
+        if (b is BlockMicroBlock)
+        {
+            Cuboidf[] microColliders = ((BlockMicroBlock)b).GetCollisionBoxes(api.World.BlockAccessor, pos);
+        }*/
         IPlayer[] players = sapi.Server.Players;
         if (messageDim == null)
         {
@@ -256,135 +262,121 @@ public class BlockyVehicleLibModSystem : ModSystem
         }
 
         entity.Pos.SetPos(pos.X + 0.5f, pos.Y + 1f, pos.Z + 0.5f);
-        
         dim.CurrentPos.SetPos(entity.Pos);
+        if (loadedDim) EntityVehicle.InitializeVehicle(entity, dim);//re-initialize to fix desync issue
         serverChannel.SendPacket(new DimensionSpawnClientResponse() {dimId = dim.subDimensionId, blockPos = pos, vecPos = message.pos, blockId = message.blockId}, (IServerPlayer) player);
         await WaitingOnClient();
         //Do these after client side
         int blockId = message.blockId;
-        int[] blockIds = new int[20];
-        BlockPos[] localPos = new BlockPos[20];
-        int maxX = 0; int maxY = 0; int maxZ = 0;
-        for (int i = 0; i < 10; i++)//Staircase formation
-        {
-            dim.SetBlock(blockId, dimPos, new ItemStack());
-            blockIds[2 * i] = dim.GetBlock(dimPos).BlockId;
-            localPos[2 * i] = dimPos - localOrigin;
-            maxX = Math.Max(maxX, localPos[2 * i].X);
-            maxY = Math.Max(maxY, localPos[2 * i].Y);
-            maxZ = Math.Max(maxZ, localPos[2 * i].Z);
-            dimPos.X += 1;
-            dim.SetBlock(blockId, dimPos, new ItemStack());
-            blockIds[2 * i + 1] = dim.GetBlock(dimPos).BlockId;
-            localPos[2 * i + 1] = dimPos -  localOrigin;
-            maxX = Math.Max(maxX, localPos[2 * i + 1].X);
-            maxY = Math.Max(maxY, localPos[2 * i + 1].Y);
-            maxZ = Math.Max(maxZ, localPos[2 * i + 1].Z);
-            dimPos.Y += 1;
-        }
-        //dim.RecalculateCenterOfMass(api.World);
+        DebugBuild(blockId, dim, dimPos, localOrigin, out int[] blockIds, out BlockPos[] localPos);
+        
+        dim.RecalculateCenterOfMass(api.World);
         //Send relevant information to the client side to build the colliders
-        serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId}, (IServerPlayer) player);
-        api.Logger.Event("Block ID: " + dim.GetBlockId(dimPos));
+        serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId, CoM = dim.CenterOfMass}, (IServerPlayer) player);
+        api.Logger.Event("Server Side Center of Mass: " + dim.CenterOfMass);
         //sapi.World.BlockAccessor.SetBlock(blockId, pos2, 0);
         //dim.UnloadUnusedServerChunks();
-        
         dim.CollectChunksForSending(players);
         api.Logger.Event("Vehicle Spawned Successfully");
     }
-    /*
-    internal static T? readInternalField<O, T>(ILogger logger, O obj, string fieldName)
-    {
-        if (obj == null)
-        {
-            logger.Error("{0}.{1} Cannot read internal field of null", typeof(O).Name, fieldName);
-            return default(T);
-        }
 
-        FieldInfo? field = typeof(O).GetField(
-            fieldName,
-            // Include public in case they change it to be public
-            BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance
-        );
-        if (field == null)
-        {
-            logger.Error("{0}.{1} does not exist", typeof(O).Name, fieldName);
-            return default(T);
-        }
-        if (field.IsPublic)
-        {
-            logger.Warning("{0}.{1} is public, reflection is no longer needed", typeof(O).Name, fieldName);
-        }
-        object? val = field.GetValue(obj);
-        if (val == null)
-        {
-            logger.Warning("{0}.{1} is null", typeof(O).Name, fieldName);
-            return default(T);
-        }
-        if (!val.GetType().IsAssignableTo(typeof(T)))
-        {
-            logger.Error("{0}.{1} has an unexpected type: {2} that is not assignable to {3}", typeof(O).Name, fieldName, val.GetType(), typeof(T));
-            return default(T);
-        }
-        return (T)val;
-    }*/
-
-    public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos pos2, BlockPos localOrigin)
+    public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos pos, BlockPos localOrigin, out int[] blockIds, out BlockPos[] localPos)
     {
-        
-        int[] blockIds = new int[20];
-        BlockPos[] localPos = new BlockPos[20];
-        IWorldChunk chunk;
+        blockIds = new int[20];
+        localPos = new BlockPos[20];
         for (int i = 0; i < 10; i++)//Staircase formation
         {
-            chunk = dim.GetChunkAtBlockPos(pos2);
-            dim.CallSetSolidBlock(blockId, pos2, chunk, new ItemStack());
-            blockIds[2 * i] = dim.GetBlock(pos2).BlockId;
-            localPos[2 * i] = pos2 - localOrigin;
-            pos2.X += 1;
-            chunk = dim.GetChunkAtBlockPos(pos2);
-            dim.CallSetSolidBlock(blockId, pos2, chunk, new ItemStack());
-            blockIds[2 * i + 1] = dim.GetBlock(pos2).BlockId;
-            localPos[2 * i + 1] = pos2 -  localOrigin;
-            pos2.Y += 1;
+            dim.SetBlock(blockId, pos, new ItemStack());
+            blockIds[2 * i] = dim.GetBlock(pos).BlockId;
+            localPos[2 * i] = pos - localOrigin;
+            pos.X += 1;
+            dim.SetBlock(blockId, pos, new ItemStack());
+            blockIds[2 * i + 1] = dim.GetBlock(pos).BlockId;
+            localPos[2 * i + 1] = pos -  localOrigin;
+            pos.Y += 1;
         }
     }
 
-    public BuiltCompound? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId)
+    public CompoundCollider? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId, Vec3d CoM)
     {
         if (api.Side == EnumAppSide.Server) return null;//Only needed on client side
         BlockyVehicle dim = (BlockyVehicle)((ICoreClientAPI)api).World.MiniDimensions[dimId];
-        List<ManualChildBox> boxList = new List<ManualChildBox>();
-        boxList.Capacity = blockIds.Length;
-        api.Logger.Event("blockIds.Length: " + blockIds.Length);
-        for (int i = 0; i < blockIds.Length; i++)
-        {
-            CompositeShape shape = api.World.BlockAccessor.GetBlock(blockIds[i]).Shape; //this will only work with full blocks, unlikely to respect chiseled blocks
-            ManualChildBox box = new ManualChildBox()
-            {
-                HalfExtents = new Vector3(shape.Scale/2),
-                LocalOrientation = Quaternion.Identity,
-                LocalPosition = new Vector3(shape.offsetZ + localPos[i].Z + 0.5f, shape.offsetY + localPos[i].Y + 0.5f, shape.offsetX + localPos[i].X + 0.5f)//Swapping x and z to correct orientation
-            };
-            api.Logger.Event("Local Position: " + box.LocalPosition);
-            boxList.Add(box);
-        }
-        dim.RecalculateCenterOfMass(api.World);
-        BuiltCompound cachedShapes = new BuiltCompound()
-        {
-            LocalCenterOfMassOffset = new Vector3((float)dim.CenterOfMass.X, (float)dim.CenterOfMass.Y,
-                (float)dim.CenterOfMass.Z),
-            ManualChildBoxes = boxList
-        };
         Entity entity = ((ICoreClientAPI)api).World.GetEntityById(entityId);
+        if (entity == null)
+        {
+            api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Entity Not Found");
+            return null;
+        }
         DynamicPhysicsBehaviour? behaviour = entity.GetBehavior<DynamicPhysicsBehaviour>();
         if (behaviour == null)
         {
             api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Dynamic Physics Behaviour Not Found");
             return null;
         }
-        behaviour.VehicleChildBoxes.AddRange(cachedShapes.ManualChildBoxes);
-        //api.Logger.Event("Center Of Mass: "  + dim.CenterOfMass.ToString());//Currently returning (0, 0, 0)
+        List<LocalBox> boxList = new List<LocalBox>();
+        api.Logger.Event("blockIds.Length: " + blockIds.Length);
+        for (int i = 0; i < blockIds.Length; i++)
+        {
+            Block block = dim.GetBlock(blockIds[i]);
+            int degY = 0;
+            if (block.Code.Path.Contains("-north-"))
+            {
+                api.Logger.Event("Block North: " + block.Code.Path);
+                degY = 90;
+            }
+            if (block.Code.Path.Contains("-west-"))
+            {
+                api.Logger.Event("Block West: " + block.Code.Path);
+                degY = 180;
+            }
+
+            if (block.Code.Path.Contains("-south-"))
+            {
+                api.Logger.Event("Block South: " + block.Code.Path);
+                degY = 270;
+            }
+
+            if (block.Code.Path.Contains("-east-"))
+            {
+                api.Logger.Event("Block East: " + block.Code.Path);
+                degY = 0;
+            }
+            Cuboidf[] colliders = block.CollisionBoxes;
+            foreach (Cuboidf collider in colliders)
+            {
+                Cuboidf collider2 = collider.RotatedCopy(0, degY, 0, new Vec3d(0.5, 0.5, 0.5));//will likely need to make this more sophisticated later
+                //api.Logger.Event("Collision Box: " + collider.ToString());
+                //api.Logger.Event("Collision Box Half Extents: [{0}, {1}, {2}]", (collider.X2 - collider.X1)/2, (collider.Y2-collider.Y1)/2 , (collider.Z2-collider.Z1)/2);
+                //api.Logger.Event("Collision Box Center: [{0}, {1}, {2}]", (collider.X2 + collider.X1)/2, (collider.Y2 + collider.Y1)/2 , (collider.Z2 + collider.Z1)/2);
+                collider2.X1 = (float)Math.Round(collider2.X1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Y1 = (float)Math.Round(collider2.Y1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Z1 = (float)Math.Round(collider2.Z1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.X2 = (float)Math.Round(collider2.X2, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Y2 = (float)Math.Round(collider2.Y2, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Z2 = (float)Math.Round(collider2.Z2, 2, MidpointRounding.ToPositiveInfinity);
+                //api.Logger.Event("Collision Box2: [{0}, {1}, {2}] => [{3}, {4}, {5}]", collider2.X1, collider2.Y1, collider2.Z1,  collider2.X2, collider2.Y2, collider2.Z2);
+                //api.Logger.Event("Collision Box2 Half Extents: [{0}, {1}, {2}]", (collider2.X2 - collider2.X1)/2, (collider2.Y2 - collider2.Y1)/2 , (collider2.Z2 - collider2.Z1)/2);
+                //api.Logger.Event("Collision Box2 Center: [{0}, {1}, {2}]", (collider2.X2 + collider2.X1)/2, (collider2.Y2 + collider2.Y1)/2 , (collider2.Z2 + collider2.Z1)/2);
+                LocalBox box = new LocalBox()
+                {//There are some mild imprecision with the collision boxes, but that's a problem for the future.
+                    LocalPosition = new Vector3((collider2.Z2 + collider2.Z1)/2 + localPos[i].Z, (collider2.Y2 + collider2.Y1)/2 + localPos[i].Y, (collider2.X2 + collider2.X1)/2 + localPos[i].X),//Swapping x and z to correct orientation
+                    LocalOrientation = Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), (float)((degY) * Math.PI / 180)),
+                    HalfExtents = new Vector3((collider2.Z2-collider2.Z1)/2, (collider2.Y2-collider2.Y1)/2, (collider2.X2-collider2.X1)/2)
+
+                };
+                boxList.Add(box);
+            }
+        }
+        CompoundCollider cachedShapes = new CompoundCollider()
+        {
+            LocalCenterOfMassOffset = new Vector3((float)CoM.X, (float)CoM.Y, (float)CoM.Z),
+            Boxes = boxList.ToArray()
+        };
+        
+        behaviour.collider = cachedShapes;
+        behaviour.mod.AddCompound(entity.EntityId.ToString(), cachedShapes);
+        behaviour.mod.Registry.Register(behaviour);
+        
         return cachedShapes;
     }
 
@@ -399,8 +391,8 @@ public class BlockyVehicleLibModSystem : ModSystem
         Vec3d newPos = message.vecPos.Add(new Vec3f(0.5f, 1.0f, 0.5f));
         dim.CurrentPos.SetPos(newPos);
         dim.selectionTrackingOriginalPos = message.blockPos;//Need to set this for it to render in the world
-        dim.selectionTrackingOriginalPos.Y += 1;
-        capi.World.SpawnEntity(EntityVehicle.CreateVehicle(capi, dim));
+        EntityVehicle entity = EntityVehicle.CreateVehicle(capi, dim);
+        capi.World.SpawnEntity(entity);
         capi.Network.GetChannel("VehicleNetworkApi").SendPacket<DimensionSpawnClientComplete>(new DimensionSpawnClientComplete() {success = true});
     }
     

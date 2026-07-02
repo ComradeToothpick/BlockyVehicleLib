@@ -12,6 +12,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.Common;
+using Vintagestory.GameContent;
 using Vintagestory.Server;
 
 #nullable disable
@@ -162,6 +163,8 @@ public class ItemVehicleWand : Item
                     return;
                 }
             }
+
+            
             clientChannel.SendPacket(new DimensionSpawnRequest() { dimensionIndex = DimensionIndex, pos = pos, blockSel = blockSel, blockId = blockSel.Block.BlockId});
         }
     }

@@ -63,21 +63,6 @@ namespace BlockyVehicleLib.Network
         [ProtoMember(1)] public long entityId;
         [ProtoMember(2)] public int subDimensionId;
     }
-    
-    [ProtoContract]
-    public class VehicleDimPacket
-    {
-        [ProtoMember(1)]
-        public int dimensionIndex;
-        [ProtoMember(2)]
-        public int ChunkX;
-        [ProtoMember(3)]
-        public int ChunkZ;
-        [ProtoMember(4)]
-        public int[] blockIds;
-        [ProtoMember(5)]
-        public ushort[] QuadHeights;
-    }
 
     [ProtoContract]
     public class VehicleBlocks
@@ -86,5 +71,27 @@ namespace BlockyVehicleLib.Network
         [ProtoMember(2)] public required BlockPos[] localPos;
         [ProtoMember(3)] public required int dimId;
         [ProtoMember(4)] public required long entityId;
+        [ProtoMember(5)] public required Vec3d CoM;
+    }
+    
+    [ProtoContract]
+    public class ChunkConstructionData
+    {
+        [ProtoMember(1)] public byte[] Data;
+        [ProtoMember(2)] public int chunkX;
+        [ProtoMember(3)] public int chunkY;
+        [ProtoMember(4)] public int chunkZ;
+    }
+    
+    [ProtoContract(ImplicitFields = ImplicitFields.AllPublic)]
+    public class BlockReinforcement
+    {
+        public int Strength;
+        public string PlayerUID;
+        public string LastPlayername;
+        public bool Locked;
+        public string LockedByItemCode;
+        public int GroupUid;
+        public string LastGroupname;
     }
 }

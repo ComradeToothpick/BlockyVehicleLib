@@ -1,19 +1,22 @@
 The goal of this project is to create a library which allows the creation of block based vehicles/physics objects in Vintage Story. I'm attempting to build off of the existing minidimension systems that exist in the game code already.
-The main problem is that the existing system does not allow for players/other entities to collide with the object. To address this, I have created a type of cuboid called a PsuedoCuboid (what a creative name) that tracks a central position, length, width, height, and rotation in Quaternion form.
-Another big barrier is that it seems like the existing testship function in the game does not render in the latest version of the game. I am at this point unsure if that is an issue for just me or if this is a broader issue. There are specific blocks that didn't render in 1.19.8, like doors and gears.
-The third barrier is not being able to interact with blocks like chests or beds.
+This is currently utilising the work of Davis99 "PhysicsLib", which I have forked and modified to allow collisions to work correctly.
+The next major thing I want to work on is getting proper rigidbody physics working, which is something that has been achieved by several modders in the past.
+
 
 The most important thing to get working is getting collisions to work for vehicles, which is a 3 part problem:
--Getting entities to correctly collide with vehicles.
--Getting vehicles to have to capability of moving/being affected by physics.
+-Getting vehicles to have to capability of moving/being affected by physics. (Gravity)
 -Getting vehicles to correctly collide with the world terrain.
 
 Major things that need to be worked on/fixed:
--PsuedoCuboids do not yet render an outline
--Don't have an easy way to put PsuedoCuboids into the game world for testing purposes.
+Reworking PhysicsLib DynamicPhysicsBehaviour to tick at the same rate as other motion in the game (preventing stuttering)
 
 Lower priority issues to address:
--Coming up with a way of getting a group of blocks to be part of the same vehicle all at once.
+Coming up with a method of assigning blocks to be turned into a rigidbody from the world. (Explore block reinforcing)
+Coming up with a method for iterating through adjacent blocks and checking for the relevant assignment.
+Preserve rigidbodies through saving and loading.
+Set up config options (No. of rigidbodies per player, probably other stuff)
+Rework PhysicsLib DynamicPhysicsBehaviour to use friction and other block properties to affect entities differently (Climbable, Slowing)
+Find a way to make liquids make sense
 
 Not yet possible:
 -Coming up with survival integration

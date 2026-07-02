@@ -29,12 +29,15 @@ public class EntityVehicle : EntityChunky
     public double[] angVelocity = new double[4];
     public bool spawned = false;
     public List<Cuboidf> OrigCollisionBox = new List<Cuboidf>();
-    private BlockPos minPos = new BlockPos(1);
-    private BlockPos maxPos = new BlockPos(1);
-    private const int dimRadius = 8;
+    //private BlockPos minPos = new BlockPos(1);
+    //private BlockPos maxPos = new BlockPos(1);
+    //private const int dimRadius = 8;
     private BlockPos localOrigin;
+    public override bool ApplyGravity => false;//I really didn't expect this to just work as well as it did, still lots of work to do though
+    public override bool IsInteractable => false;
+    public bool IsRigidBody => true;
     
-
+    public List<OrientedBox> dynamicBoxes = new();
     public EntityVehicle() : base()
     {
     }
@@ -45,7 +48,7 @@ public class EntityVehicle : EntityChunky
         this.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
     }
     
-    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockAccessorMovable dim)
+    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockyVehicle dim)
     {
         entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
         entity.blocks = dim;
@@ -58,27 +61,28 @@ public class EntityVehicle : EntityChunky
         entity.angVelocity = ConvertEulerAngles(0.0f, 0.0f, 0.0f);
         entity.angVelocity[3] = 0;
         entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
-        entity.WatchedAttributes.SetAttribute("dim", (IAttribute) new IntAttribute(dim.subDimensionId));
+        entity.WatchedAttributes.SetAttribute("dim", new IntAttribute(dim.subDimensionId));
         entity.tickOffset = dim.subDimensionId % 100;
+        
         BlockPos blockPos = new BlockPos(1);
         ((BlockyVehicle)entity.blocks).AdjustPosForSubDimension(ref blockPos);
         //blockPos.X = 0 + dim.subDimensionId % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
         //blockPos.Y = 0 + 8192 /*0x2000*/;
         //blockPos.Z = 0 + dim.subDimensionId / 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
         entity.localOrigin = blockPos;
-        entity.minPos = new BlockPos(blockPos.X - dimRadius + 1, blockPos.Y - dimRadius + 1, blockPos.Z - dimRadius + 1, 1);
-        entity.maxPos = new BlockPos(blockPos.X + dimRadius, blockPos.Y + dimRadius, blockPos.Z + dimRadius, 1);
+        //entity.minPos = new BlockPos(blockPos.X - dimRadius + 1, blockPos.Y - dimRadius + 1, blockPos.Z - dimRadius + 1, 1);
+        //entity.maxPos = new BlockPos(blockPos.X + dimRadius, blockPos.Y + dimRadius, blockPos.Z + dimRadius, 1);
         entity.spawned = true;
         return entity;
     }
 
-    public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockAccessorMovable dim)
+    public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockyVehicle dim)
     {
         EntityVehicle entity = (EntityVehicle) sapi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
         return InitializeVehicle(entity, dim);
     }
     
-    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockAccessorMovable dim)
+    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockyVehicle dim)
     {
         EntityVehicle entity = (EntityVehicle) capi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
         return InitializeVehicle(entity, dim);
@@ -98,7 +102,7 @@ public class EntityVehicle : EntityChunky
         if (Api.Side == EnumAppSide.Server)
         {
             tickCounter++;
-            if (tickCounter % 100 == tickOffset)
+            if (tickCounter % 100 == tickOffset)//Need a better way to call this when needed
             {
                 UpdateBlocks();
             }
@@ -108,7 +112,7 @@ public class EntityVehicle : EntityChunky
         
         if (spawned)
         {
-            if (blocks.Dirty)
+            if (blocks!.Dirty)
             {
                 UpdateBlocks();
             }
@@ -118,11 +122,10 @@ public class EntityVehicle : EntityChunky
             //Pos.Roll = angles[0];
             //Pos.Yaw = angles[1];
             //Pos.Pitch = angles[2];
-            Pos.Motion.X = 0.01d;
+            Pos!.Motion.X = 0.01d;
             //if (Pos.X > blocks.selectionTrackingOriginalPos.X + 1.5f) blocks.selectionTrackingOriginalPos.X += 1;
-            ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);
-
-
+            ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);//Ensures no desync
+            ((BlockyVehicle)blocks).CurrentPos.Motion = Pos.Motion;//Hopefully prevents jittery movement
             //this.blocks.CurrentPos = this.Pos;
             //this.blocks.CurrentPos =  this.Pos;
             //this.Pos.X += this.Pos.Motion.X * dt;
@@ -138,7 +141,7 @@ public class EntityVehicle : EntityChunky
         */
     }
 
-    public void OnPhysicsTick(float dt)
+    public void SimPhysics(float dt)
     {
         
     }
@@ -164,10 +167,10 @@ public class EntityVehicle : EntityChunky
         return output;
     }
 
-    public BuiltCompound? GetShape()
+    public CompoundCollider? GetShape()
     {
         return null;
-        Api.Logger.Event("GetShape is executing");
+        /*Api.Logger.Event("GetShape is executing");
         DynamicPhysicsBehaviour? behaviour = this.GetBehavior<DynamicPhysicsBehaviour>();
         if (behaviour == null)
         {
@@ -200,7 +203,7 @@ public class EntityVehicle : EntityChunky
         for (int y =  minPos.Y; y <= maxPos.Y; y++)
         for (int z =  minPos.Z; z <= maxPos.Z; z++)
         {
-            BlockPos blockPos = new BlockPos(x, y, z, 1);//Have to do it this way as WalkBlocks is not dimensionally aware
+            //BlockPos blockPos = new BlockPos(x, y, z, 1);//Have to do it this way as WalkBlocks is not dimensionally aware
             Block block = blockAccessor.GetBlock(blockPos);
             if (block.BlockId != 0)
             {
@@ -232,10 +235,10 @@ public class EntityVehicle : EntityChunky
         cachedShapes.ManualChildBoxes.AddRange(behaviour.VehicleChildBoxes);
         ((BlockAccessorMovable)this.blocks).RecalculateCenterOfMass(Api.World);
         cachedShapes.LocalCenterOfMassOffset = new Vector3((float)(((BlockAccessorMovable)this.blocks).CenterOfMass.X), (float)((BlockAccessorMovable)this.blocks).CenterOfMass.Y, (float)((BlockAccessorMovable)this.blocks).CenterOfMass.Z);
-        return cachedShapes;
+        return cachedShapes;*/
     }
 
-    public void UpdateBlocks(BuiltCompound? cachedShapes = null)
+    public void UpdateBlocks(CompoundCollider? cachedShapes = null)
     {
         if (this.Api.Side == EnumAppSide.Server)
         {
