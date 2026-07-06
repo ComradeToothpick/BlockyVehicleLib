@@ -89,6 +89,11 @@ public class EntityVehicle : EntityChunky
         return sapi.World.GetPlayersAround(entityPos.XYZ, (float)sapi.World.DefaultEntityTrackingRange,
             (float)sapi.World.DefaultEntityTrackingRange);
     }
+
+    public void BlocksInitialize()
+    {
+        ((BlockyVehicle)blocks).Initialize(this);
+    }
     
     public override void OnGameTick(float dt)
     {
@@ -120,27 +125,14 @@ public class EntityVehicle : EntityChunky
             //Pos.Pitch = angles[2];
             Pos.Motion.X = 0.01d;
             //if (Pos.X > blocks.selectionTrackingOriginalPos.X + 1.5f) blocks.selectionTrackingOriginalPos.X += 1;
-            ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);
-
-
+            //((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);
+            
             //this.blocks.CurrentPos = this.Pos;
             //this.blocks.CurrentPos =  this.Pos;
             //this.Pos.X += this.Pos.Motion.X * dt;
             //this.Pos.Y += this.Pos.Motion.Y * dt;
             //this.Pos.Z += this.Pos.Motion.Z * dt;
         }
-        /*
-        ((Entity) this).Pos.Motion.X = 0.01;
-        ((Entity) this).Pos.Y = (double) (int) ((Entity) this).Pos.Y + 0.5;
-        ((Entity) this).Pos.Yaw = (float) (((Entity) this).Pos.X % 6.3) / 20f;
-        ((Entity) this).Pos.Pitch = (float) GameMath.Sin(((Entity) this).Pos.X % 6.3) / 5f;
-        ((Entity) this).Pos.Roll = (float) GameMath.Sin(((Entity) this).Pos.X % 12.6) / 3f;
-        */
-    }
-
-    public void OnPhysicsTick(float dt)
-    {
-        
     }
     
     public override void FromBytes(BinaryReader reader, bool forClient)
@@ -150,6 +142,7 @@ public class EntityVehicle : EntityChunky
 
     public void Dispose()
     {
+        if (blocks is BlockyVehicle) ((BlockyVehicle)blocks).Dispose();
     }
     
     private double[] ApplyRotation(double[] angVelocity, double[] rot, double dt)
@@ -178,7 +171,7 @@ public class EntityVehicle : EntityChunky
         if (behaviour.VehicleChildBoxes == null)
         {
             Api.Logger.Event("behaviour.VehicleChildBoxes is null, creating a new list");
-            behaviour.VehicleChildBoxes = new List<ManualChildBox>();
+            behaviour.VehicleChildBoxes = new List<LocalBox>();
         }
         //walk through the blocks in the minidimension, collect the shapes of the blocks and compile them together
         if (this.blocks == null)
@@ -194,7 +187,7 @@ public class EntityVehicle : EntityChunky
         }
         IBlockAccessor blockAccessor = this.blocks;
         BuiltCompound cachedShapes = new BuiltCompound();
-        cachedShapes.ManualChildBoxes = new List<ManualChildBox>();
+        cachedShapes.Boxes = new List<LocalBox>();
         //blockAccessor.WalkBlocks(this.minPos, this.maxPos, (Action<Block, int, int, int>)((block, x, y, z) =>
         for (int x = minPos.X; x <= maxPos.X; x++)
         for (int y =  minPos.Y; y <= maxPos.Y; y++)
@@ -206,7 +199,7 @@ public class EntityVehicle : EntityChunky
             {
                 CompositeShape shape = block.Shape.Clone();
                 Api.Logger.Event("Block Detected: " + block.BlockId);
-                ManualChildBox box1 = new ManualChildBox()
+                LocalBox box1 = new LocalBox()
                 {
                     HalfExtents = new Vector3(shape.Scale/2),
                     LocalOrientation = Quaternion.CreateFromYawPitchRoll(shape.rotateY, shape.rotateX, shape.rotateZ),
@@ -215,7 +208,7 @@ public class EntityVehicle : EntityChunky
                 behaviour.VehicleChildBoxes.Add(box1);
                 foreach (CompositeShape b in shape.Overlays)
                 {
-                    ManualChildBox box = new ManualChildBox()
+                    LocalBox box = new LocalBox()
                     {
                         HalfExtents = new Vector3(b.Scale/2),
                         LocalOrientation = Quaternion.CreateFromYawPitchRoll(b.rotateY, b.rotateX, b.rotateZ),
@@ -229,7 +222,7 @@ public class EntityVehicle : EntityChunky
                 //Api.Logger.Event("Air detected at: ({0}, {1}, {2})",  x, y, z);
             }
         }//), true);
-        cachedShapes.ManualChildBoxes.AddRange(behaviour.VehicleChildBoxes);
+        cachedShapes.Boxes.AddRange(behaviour.VehicleChildBoxes);
         ((BlockAccessorMovable)this.blocks).RecalculateCenterOfMass(Api.World);
         cachedShapes.LocalCenterOfMassOffset = new Vector3((float)(((BlockAccessorMovable)this.blocks).CenterOfMass.X), (float)((BlockAccessorMovable)this.blocks).CenterOfMass.Y, (float)((BlockAccessorMovable)this.blocks).CenterOfMass.Z);
         return cachedShapes;
@@ -261,7 +254,18 @@ public class EntityVehicle : EntityChunky
             if (!blocks.Dirty) return;//Recalculate the DynamicCollisionBoxes on the client side only if the miniDimension is changed
         }
     }
-    
+
+    public void BlocksDirty()
+    {
+        this.blocks.Dirty = true;
+    }
+
+    public override void OnReceivedServerPos(bool isTeleport)
+    {
+        //base.OnReceivedServerPos(isTeleport);
+        ((BlockyVehicle)blocks).OnReceivedServerPos(isTeleport, this);
+    }
+
     public static double[] ConvertEulerAngles(double pitch, double yaw, double roll)//I think the maths here is wrong
     {
         double[] output = new double[4];

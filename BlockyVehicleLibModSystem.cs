@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Threading.Tasks;
+using BlockyVehicleLib.Blocks;
 using BlockyVehicleLib.Items;
 using BlockyVehicleLib.Entities;
 using BlockyVehicleLib.Network;
@@ -94,7 +95,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         
         //Mod.Logger.Notification("Mini dimension loaded, index: " + index);
     }
-
+    
     public override void AssetsFinalize(ICoreAPI api)
     {
         base.AssetsFinalize(api);
@@ -170,7 +171,8 @@ public class BlockyVehicleLibModSystem : ModSystem
         BlockPos[] localPos = message.localPos;
         int dimId = message.dimId;
         long entityId = message.entityId;
-        BuiltCompound? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId);
+        Vec3d CoM = message.CoM;
+        BuiltCompound? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId, CoM);
         if (cachedShapes == null)
         {
             api.Logger.Event("Vehicle collider construction failed!");
@@ -204,6 +206,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         //Place the blocks into the minidimension
         //Will need a more rigourous way to place blocks in the minidimension once more than one block are involved
         
+        //The construction mode must be collected on the server side from the server side version of the wand, as the client side cannot correctly choose the right mode
         IMiniDimension? messageDim = sapi.Server.GetMiniDimension(message.dimensionIndex);
         BlockyVehicle dim;
         bool loadedDim = false;
@@ -255,36 +258,32 @@ public class BlockyVehicleLibModSystem : ModSystem
             _loadedEntityVehicles.TryAdd(message.dimensionIndex, entity.EntityId);
         }
 
-        entity.Pos.SetPos(pos.X + 0.5f, pos.Y + 1f, pos.Z + 0.5f);
-        
+        entity.Pos.SetPos(pos.X + 0.5f, pos.Y, pos.Z + 0.5f);
+        entity.BlocksInitialize();
         dim.CurrentPos.SetPos(entity.Pos);
         serverChannel.SendPacket(new DimensionSpawnClientResponse() {dimId = dim.subDimensionId, blockPos = pos, vecPos = message.pos, blockId = message.blockId}, (IServerPlayer) player);
         await WaitingOnClient();
         //Do these after client side
         int blockId = message.blockId;
-        int[] blockIds = new int[20];
-        BlockPos[] localPos = new BlockPos[20];
-        int maxX = 0; int maxY = 0; int maxZ = 0;
-        for (int i = 0; i < 10; i++)//Staircase formation
+        int[] blockIds;
+        BlockPos[] localPos;
+        if (message.mode == EnumVehicleMode.Debug)
         {
-            dim.SetBlock(blockId, dimPos, new ItemStack());
-            blockIds[2 * i] = dim.GetBlock(dimPos).BlockId;
-            localPos[2 * i] = dimPos - localOrigin;
-            maxX = Math.Max(maxX, localPos[2 * i].X);
-            maxY = Math.Max(maxY, localPos[2 * i].Y);
-            maxZ = Math.Max(maxZ, localPos[2 * i].Z);
-            dimPos.X += 1;
-            dim.SetBlock(blockId, dimPos, new ItemStack());
-            blockIds[2 * i + 1] = dim.GetBlock(dimPos).BlockId;
-            localPos[2 * i + 1] = dimPos -  localOrigin;
-            maxX = Math.Max(maxX, localPos[2 * i + 1].X);
-            maxY = Math.Max(maxY, localPos[2 * i + 1].Y);
-            maxZ = Math.Max(maxZ, localPos[2 * i + 1].Z);
-            dimPos.Y += 1;
+            DebugBuild(blockId, dim, dimPos, localOrigin, out blockIds, out localPos);
         }
-        //dim.RecalculateCenterOfMass(api.World);
+        else if (message.mode == EnumVehicleMode.Construction)
+        {
+            if(!ConstructionBuild(pos, dim, localOrigin, player, out blockIds, out localPos)) api.Logger.Error("[BlockyVehicleModSystem.OnDimensionSpawnRequest] Failed to build blocks!");;
+        }
+        else
+        {
+            DebugBuild(blockId, dim, dimPos, localOrigin, out blockIds, out localPos);
+        }
+        
+        entity.BlocksDirty();
         //Send relevant information to the client side to build the colliders
-        serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId}, (IServerPlayer) player);
+        dim.RecalculateCenterOfMass(api.World);
+        serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId, CoM = dim.CenterOfMass}, (IServerPlayer) player);
         api.Logger.Event("Block ID: " + dim.GetBlockId(dimPos));
         //sapi.World.BlockAccessor.SetBlock(blockId, pos2, 0);
         //dim.UnloadUnusedServerChunks();
@@ -329,62 +328,174 @@ public class BlockyVehicleLibModSystem : ModSystem
         return (T)val;
     }*/
 
-    public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos pos2, BlockPos localOrigin)
+    public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos dimPos, BlockPos localOrigin, out int[] blockIds, out BlockPos[] localPos)
     {
-        
-        int[] blockIds = new int[20];
-        BlockPos[] localPos = new BlockPos[20];
-        IWorldChunk chunk;
+        blockIds = new int[20];
+        localPos = new BlockPos[20];
+        //int maxX = 0; int maxY = 0; int maxZ = 0;
         for (int i = 0; i < 10; i++)//Staircase formation
         {
-            chunk = dim.GetChunkAtBlockPos(pos2);
-            dim.CallSetSolidBlock(blockId, pos2, chunk, new ItemStack());
-            blockIds[2 * i] = dim.GetBlock(pos2).BlockId;
-            localPos[2 * i] = pos2 - localOrigin;
-            pos2.X += 1;
-            chunk = dim.GetChunkAtBlockPos(pos2);
-            dim.CallSetSolidBlock(blockId, pos2, chunk, new ItemStack());
-            blockIds[2 * i + 1] = dim.GetBlock(pos2).BlockId;
-            localPos[2 * i + 1] = pos2 -  localOrigin;
-            pos2.Y += 1;
+            dim.SetBlock(blockId, dimPos, new ItemStack());
+            blockIds[2 * i] = dim.GetBlock(dimPos).BlockId;
+            localPos[2 * i] = dimPos - localOrigin;
+            //maxX = Math.Max(maxX, localPos[2 * i].X);
+            //maxY = Math.Max(maxY, localPos[2 * i].Y);
+            //maxZ = Math.Max(maxZ, localPos[2 * i].Z);
+            dimPos.X += 1;
+            dim.SetBlock(blockId, dimPos, new ItemStack());
+            blockIds[2 * i + 1] = dim.GetBlock(dimPos).BlockId;
+            localPos[2 * i + 1] = dimPos -  localOrigin;
+            //maxX = Math.Max(maxX, localPos[2 * i + 1].X);
+            //maxY = Math.Max(maxY, localPos[2 * i + 1].Y);
+            //maxZ = Math.Max(maxZ, localPos[2 * i + 1].Z);
+            dimPos.Y += 1;
         }
     }
 
-    public BuiltCompound? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId)
+    public bool ConstructionBuild(BlockPos startPos, BlockyVehicle dim, BlockPos localOrigin, IPlayer player, out int[] blockIds,
+        out BlockPos[] localPos)
+    {
+        Dictionary<BlockPos, int> cBlocks = GetConstructedBlocks(startPos);
+        if (cBlocks.Count == 0 || cBlocks == null)
+        {
+            api.Logger.Error("[BlockyVehicleModSystem.ConstructionBuild] No Blocks Found");
+            localPos = new BlockPos[1];
+            blockIds = new int[1];
+            return false;
+        }
+        localPos = (BlockPos[])cBlocks.Keys.ToArray().Clone();
+        blockIds = (int[])cBlocks.Values.ToArray().Clone();
+        ModSystemBlockConstruction bco = api.ModLoader.GetModSystem<ModSystemBlockConstruction>();
+        for (int i = 0; i < cBlocks.Count; i++)
+        {
+            BlockPos newPos = localPos[i] + localOrigin;
+            dim.SetBlock(blockIds[i], newPos, new ItemStack());
+        }
+        
+        foreach (BlockPos blockPos in cBlocks.Keys)
+        {
+            bco.ClearConstruction(blockPos + startPos);
+            api.World.BlockAccessor.BreakBlock(blockPos + startPos, player, 0F);
+        }
+        return true;
+    }
+
+    private Dictionary<BlockPos, int> GetConstructedBlocks(BlockPos startPos)//This is a rather inefficient method, plenty of room to optimise
+    {
+        List<BlockPos> stack = new List<BlockPos>();
+        List<BlockPos> done = new List<BlockPos>();
+        Dictionary<BlockPos, int> dimBlocks = new Dictionary<BlockPos, int>();
+        BlockPos pos = startPos;
+        stack.Add(pos);
+        IBlockAccessor blockAccessor = api.World.BlockAccessor;
+        ModSystemBlockConstruction mod = api.ModLoader.GetModSystem<ModSystemBlockConstruction>();
+        bool searching = true;
+        while (searching)
+        {
+            pos = stack[^1];
+            done.Add(pos);
+            stack.RemoveAt(stack.Count - 1);
+            
+            if (mod.IsConstructed(pos))
+            {
+                BlockPos deltaPos = new BlockPos(pos.X - startPos.X, pos.Y - startPos.Y, pos.Z - startPos.Z, 0) ;
+                int blockId = blockAccessor.GetBlock(pos).BlockId;
+                if (!dimBlocks.TryAdd(deltaPos, blockId)) api.Logger.Event("[BlockyVehicleModSystem.GetConstructedBlocks] Failed to collect Pos: " + pos + ", Block ID: " + blockId);
+                BlockPos blockPos = pos.DownCopy();
+                if (!(stack.Contains(blockPos) || done.Contains(blockPos))) stack.Add(blockPos);
+                blockPos = pos.UpCopy();
+                if (!(stack.Contains(blockPos) || done.Contains(blockPos))) stack.Add(blockPos);
+                blockPos = pos.NorthCopy();
+                if (!(stack.Contains(blockPos) || done.Contains(blockPos))) stack.Add(blockPos);
+                blockPos = pos.SouthCopy();
+                if (!(stack.Contains(blockPos) || done.Contains(blockPos))) stack.Add(blockPos);
+                blockPos = pos.EastCopy();
+                if (!(stack.Contains(blockPos) || done.Contains(blockPos))) stack.Add(blockPos);
+                blockPos = pos.WestCopy();
+                if (!(stack.Contains(blockPos) || done.Contains(blockPos))) stack.Add(blockPos);
+            }
+            if (stack.Count == 0) searching = false;
+        }
+        
+        return dimBlocks;
+    }
+
+    public BuiltCompound? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId, Vec3d CoM)
     {
         if (api.Side == EnumAppSide.Server) return null;//Only needed on client side
         BlockyVehicle dim = (BlockyVehicle)((ICoreClientAPI)api).World.MiniDimensions[dimId];
-        List<ManualChildBox> boxList = new List<ManualChildBox>();
-        boxList.Capacity = blockIds.Length;
-        api.Logger.Event("blockIds.Length: " + blockIds.Length);
-        for (int i = 0; i < blockIds.Length; i++)
-        {
-            CompositeShape shape = api.World.BlockAccessor.GetBlock(blockIds[i]).Shape; //this will only work with full blocks, unlikely to respect chiseled blocks
-            ManualChildBox box = new ManualChildBox()
-            {
-                HalfExtents = new Vector3(shape.Scale/2),
-                LocalOrientation = Quaternion.Identity,
-                LocalPosition = new Vector3(shape.offsetZ + localPos[i].Z + 0.5f, shape.offsetY + localPos[i].Y + 0.5f, shape.offsetX + localPos[i].X + 0.5f)//Swapping x and z to correct orientation
-            };
-            api.Logger.Event("Local Position: " + box.LocalPosition);
-            boxList.Add(box);
-        }
-        dim.RecalculateCenterOfMass(api.World);
-        BuiltCompound cachedShapes = new BuiltCompound()
-        {
-            LocalCenterOfMassOffset = new Vector3((float)dim.CenterOfMass.X, (float)dim.CenterOfMass.Y,
-                (float)dim.CenterOfMass.Z),
-            ManualChildBoxes = boxList
-        };
         Entity entity = ((ICoreClientAPI)api).World.GetEntityById(entityId);
+        if (entity == null)
+        {
+            api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Entity Not Found");
+            return null;
+        }
         DynamicPhysicsBehaviour? behaviour = entity.GetBehavior<DynamicPhysicsBehaviour>();
         if (behaviour == null)
         {
             api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Dynamic Physics Behaviour Not Found");
             return null;
         }
-        behaviour.VehicleChildBoxes.AddRange(cachedShapes.ManualChildBoxes);
-        //api.Logger.Event("Center Of Mass: "  + dim.CenterOfMass.ToString());//Currently returning (0, 0, 0)
+        List<LocalBox> boxList = new List<LocalBox>();
+        api.Logger.Event("blockIds.Length: " + blockIds.Length);
+        for (int i = 0; i < blockIds.Length; i++)
+        {
+            Block block = dim.GetBlock(blockIds[i]);
+            int degY = 0;
+            if (block.Code.Path.Contains("-north-"))
+            {
+                api.Logger.Event("Block North: " + block.Code.Path);
+                degY = 90;
+            }
+            if (block.Code.Path.Contains("-west-"))
+            {
+                api.Logger.Event("Block West: " + block.Code.Path);
+                degY = 180;
+            }
+
+            if (block.Code.Path.Contains("-south-"))
+            {
+                api.Logger.Event("Block South: " + block.Code.Path);
+                degY = 270;
+            }
+
+            if (block.Code.Path.Contains("-east-"))
+            {
+                api.Logger.Event("Block East: " + block.Code.Path);
+                degY = 0;
+            }
+            Cuboidf[] colliders = block.CollisionBoxes;
+            foreach (Cuboidf collider in colliders)
+            {
+                Cuboidf collider2 = collider.RotatedCopy(0, degY, 0, new Vec3d(0.5, 0.5, 0.5));//will likely need to make this more sophisticated later
+                //api.Logger.Event("Collision Box: " + collider.ToString());
+                //api.Logger.Event("Collision Box Half Extents: [{0}, {1}, {2}]", (collider.X2 - collider.X1)/2, (collider.Y2-collider.Y1)/2 , (collider.Z2-collider.Z1)/2);
+                //api.Logger.Event("Collision Box Center: [{0}, {1}, {2}]", (collider.X2 + collider.X1)/2, (collider.Y2 + collider.Y1)/2 , (collider.Z2 + collider.Z1)/2);
+                collider2.X1 = (float)Math.Round(collider2.X1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Y1 = (float)Math.Round(collider2.Y1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Z1 = (float)Math.Round(collider2.Z1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.X2 = (float)Math.Round(collider2.X2, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Y2 = (float)Math.Round(collider2.Y2, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Z2 = (float)Math.Round(collider2.Z2, 2, MidpointRounding.ToPositiveInfinity);
+                //api.Logger.Event("Collision Box2: [{0}, {1}, {2}] => [{3}, {4}, {5}]", collider2.X1, collider2.Y1, collider2.Z1,  collider2.X2, collider2.Y2, collider2.Z2);
+                //api.Logger.Event("Collision Box2 Half Extents: [{0}, {1}, {2}]", (collider2.X2 - collider2.X1)/2, (collider2.Y2 - collider2.Y1)/2 , (collider2.Z2 - collider2.Z1)/2);
+                //api.Logger.Event("Collision Box2 Center: [{0}, {1}, {2}]", (collider2.X2 + collider2.X1)/2, (collider2.Y2 + collider2.Y1)/2 , (collider2.Z2 + collider2.Z1)/2);
+                LocalBox box = new LocalBox()
+                {//There are some mild imprecision with the collision boxes, but that's a problem for the future.
+                    LocalPosition = new Vector3(-((collider2.Z2 + collider2.Z1)/2 + localPos[i].Z - 1), (collider2.Y2 + collider2.Y1)/2 + localPos[i].Y, (collider2.X2 + collider2.X1)/2 + localPos[i].X),//Swapping x and z to correct orientation
+                    LocalOrientation = Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), (float)((degY) * Math.PI / 180)),
+                    HalfExtents = new Vector3((collider2.Z2-collider2.Z1)/2, (collider2.Y2-collider2.Y1)/2, (collider2.X2-collider2.X1)/2)
+                };
+                boxList.Add(box);
+            }
+        }
+        BuiltCompound cachedShapes = new BuiltCompound()
+        {
+            LocalCenterOfMassOffset = new Vector3((float)CoM.X, (float)CoM.Y, (float)CoM.Z),
+            Boxes = boxList
+        };
+        
+        behaviour.VehicleChildBoxes = cachedShapes.Boxes;
         return cachedShapes;
     }
 

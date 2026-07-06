@@ -21,7 +21,7 @@ namespace BlockyVehicleLib.Patches
     
     
     [HarmonyPatch(typeof(DynamicPhysicsBehaviour), nameof(DynamicPhysicsBehaviour.HandleEntityChunky))]
-    public static class DynamicPhysicsBehavior_Patch
+    public static class DynamicPhysicsBehavior_Patch//This may not even do anything
     {
         [HarmonyPrefix]
         public static bool Prefix(Entity entity, out BuiltCompound? cachedShape)
@@ -40,8 +40,8 @@ namespace BlockyVehicleLib.Patches
                         entity.Api.Logger.Event("cachedShape is null");
                         return false;
                     }
-                    if(cachedShape.Value.ManualChildBoxes.Count == 0) entity.Api.Logger.Event("cachedShape.ManualChildBoxes is empty");
-                    entity.Api.Logger.Event("cachedShape.LocalCenterOfMassOffset: " + cachedShape.Value.LocalCenterOfMassOffset);
+                    if(cachedShape.Boxes.Count == 0) entity.Api.Logger.Event("cachedShape.ManualChildBoxes is empty");
+                    entity.Api.Logger.Event("cachedShape.LocalCenterOfMassOffset: " + cachedShape.LocalCenterOfMassOffset);
                 }
             }
             else

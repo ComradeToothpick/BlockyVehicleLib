@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using BlockyVehicleLib.Blocks;
 using Vintagestory;
 using BlockyVehicleLib.Entities;
 using BlockyVehicleLib.Network;
@@ -42,10 +43,15 @@ public class ItemVehicleWand : Item
     private IPlayer player;
     //limit use of modSystem, always check if the api is client or server before using it
     private BlockyVehicleLibModSystem modSystem;
+    private EnumVehicleMode mode = EnumVehicleMode.Debug;
+    private ModSystemBlockConstruction bco;
+    private BlockPos startPos = null;
+    private BlockPos endPos = null;
 
     public override void OnLoaded(ICoreAPI coreApi)
     {
         api = coreApi;
+        bco = api.ModLoader.GetModSystem<ModSystemBlockConstruction>();
         if (api is ICoreClientAPI)
         {
             clientChannel = ((ICoreClientAPI)api).Network.GetChannel("VehicleNetworkApi")
@@ -73,9 +79,9 @@ public class ItemVehicleWand : Item
         IMiniDimension dim = ((ICoreClientAPI)api).World.GetOrCreateDimension(DimensionIndex, pos);
         api.Logger.Event("attempting to create an EntityChunky");
         entity = EntityVehicle.CreateVehicle((ICoreClientAPI)api, dim);
-                
+
         playerEntity.World.SpawnEntity(entity);
-        
+
         _isSpawning = false;
         api.Logger.Event("entity spawned");
     }
@@ -88,64 +94,88 @@ public class ItemVehicleWand : Item
         bool firstEvent,
         ref EnumHandHandling handHandling)
     {
-        playerEntity = (EntityPlayer) byEntity;
+        playerEntity = (EntityPlayer)byEntity;
         player = playerEntity.World.PlayerByUid(playerEntity.PlayerUID);
-        api.Logger.Event("OnHeldInteractStart started");
-        //((CollectibleObject) this).OnHeldInteractStart(slot, byEntity, blockSel, entitySel, firstEvent, ref handHandling);
-        if (handHandling == EnumHandHandling.PreventDefault) 
+
+        
+        if (handHandling == EnumHandHandling.PreventDefault)
             return;
         if (blockSel == null)
         {
             api.Logger.Event("blockSel == null");
             return;
         }
-        //ProcessVehicleSpawningStart(byEntity, blockSel, ref handHandling);
+        if (byEntity.World.Side == EnumAppSide.Client)
+        {
+            handHandling = EnumHandHandling.PreventDefaultAction;
+        }
         
-        
-        if (!(playerEntity).World.Claims.TryAccess(player, blockSel.Position, (EnumBlockAccessFlags) 1))
+
+
+        if (!(playerEntity).World.Claims.TryAccess(player, blockSel.Position, EnumBlockAccessFlags.BuildOrBreak))
             return;
         IBlockAccessor blockAccessor = playerEntity.World.BlockAccessor;
+
         
-        /*
-        if (!(block.Code.Equals((AssetLocation) null)))
+        if (byEntity.Controls.Sneak)
         {
-            string lowerInvariant1 = ((RegistryObject) block).Code.Path.ToLowerInvariant();
-            api.Logger.Event(lowerInvariant1);
-        }*/
-        
-        AssetLocation assetLocation = new AssetLocation(Code.Domain, CodeEndWithoutParts(1));
-        api.Logger.Event("Code.Domain: " + Code.Domain);
-        api.Logger.Event("CodeEndWithoutParts: " + CodeEndWithoutParts(1));
-        
-        EntityProperties entityType = byEntity.World.GetEntityType(assetLocation);
-        if (entityType == null)
-        {
-            api.Logger.Event("entityType == null");
-            ((Entity)byEntity).World.Logger.Error(
-                "ItemVehicleWand: No such entity - vehicle");
+            AssetLocation assetLocation = new AssetLocation(Code.Domain, CodeEndWithoutParts(1));
+            api.Logger.Event("Code.Domain: " + Code.Domain);
+            api.Logger.Event("CodeEndWithoutParts: " + CodeEndWithoutParts(1));
+
+            EntityProperties entityType = byEntity.World.GetEntityType(assetLocation);
+            if (entityType == null)
+            {
+                api.Logger.Event("entityType == null");
+                ((Entity)byEntity).World.Logger.Error(
+                    "ItemVehicleWand: No such entity - vehicle");
+            }
+            else
+            {
+                pos = new Vec3d(
+                    (double)(blockSel.Position.X + (blockSel.DidOffset ? 0 : blockSel.Face.Normali.X)) + 0.5,
+                    (double)(blockSel.Position.Y + (blockSel.DidOffset ? 0 : blockSel.Face.Normali.Y)),
+                    (double)(blockSel.Position.Z + (blockSel.DidOffset ? 0 : blockSel.Face.Normali.Z)) + 0.5);
+                api.Logger.Event("attempting to create a mini dimension");
+                
+                if (bco != null && bco.IsConstructed(blockSel.Position))
+                {
+                    api.Logger.Event("Construction Mode");
+                    mode = EnumVehicleMode.Construction;
+                }
+
+                ProcessVehicleSpawnStart(blockSel, mode);
+                //entity.Pos.Yaw = ((Vintagestory.API.Common.Entities.Entity) byEntity).Pos.Yaw + 3.1415927f;
+                //entity.Pos.Dimension = blockSel.Position.dimension;
+                //entity.PositionBeforeFalling.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
+                //((TreeAttribute) entity.Attributes).SetString("origin", "playerplaced");
+                //JsonObject attributes = ((CollectibleObject) this).Attributes;
+                //((TreeAttribute) entity.WatchedAttributes).SetBool("noSpawnAnim", true);
+
+                handHandling = EnumHandHandling.PreventDefault;
+                return;
+            } 
         }
         else
         {
-            pos = new Vec3d(
-                (double) (blockSel.Position.X + (blockSel.DidOffset ? 0 : blockSel.Face.Normali.X)) + 0.5,
-                (double) (blockSel.Position.Y + (blockSel.DidOffset ? 0 : blockSel.Face.Normali.Y)),
-                (double) (blockSel.Position.Z + (blockSel.DidOffset ? 0 : blockSel.Face.Normali.Z)) + 0.5);
-            api.Logger.Event("attempting to create a mini dimension");
-            
-            ProcessVehicleSpawnStart(blockSel);
-            //entity.Pos.Yaw = ((Vintagestory.API.Common.Entities.Entity) byEntity).Pos.Yaw + 3.1415927f;
-            //entity.Pos.Dimension = blockSel.Position.dimension;
-            //entity.PositionBeforeFalling.Set(entity.Pos.X, entity.Pos.Y, entity.Pos.Z);
-            //((TreeAttribute) entity.Attributes).SetString("origin", "playerplaced");
-            //JsonObject attributes = ((CollectibleObject) this).Attributes;
-            //((TreeAttribute) entity.WatchedAttributes).SetBool("noSpawnAnim", true);
-            
+            if (startPos is null)
+            {
+                startPos = blockSel.Position;
+                handHandling = EnumHandHandling.PreventDefault;
+                return;
+            }
+            endPos = blockSel.Position;
+            bco.StrengthenMultiBlocks(startPos, endPos, player, 1);
+            startPos = null;
+            endPos = null;
+            /*
+            api.Logger.Event("Attempting to construct on a block");
+            bco.StrengthenBlock(blockSel.Position, player, 1);*/
             handHandling = EnumHandHandling.PreventDefault;
-            return;
         }
     }
 
-    public async void ProcessVehicleSpawnStart(BlockSelection blockSel)
+    public async void ProcessVehicleSpawnStart(BlockSelection blockSel, EnumVehicleMode mode)
     {
         if (this.api is ICoreClientAPI)
         {
@@ -158,11 +188,11 @@ public class ItemVehicleWand : Item
                 await Waiting();
                 if (DimensionIndex == -1)
                 {
-                    api.Logger.Event("Operation time out: DimensionIndex == -1");
+                    api.Logger.Error("Operation time out: DimensionIndex == -1");
                     return;
                 }
             }
-            clientChannel.SendPacket(new DimensionSpawnRequest() { dimensionIndex = DimensionIndex, pos = pos, blockSel = blockSel, blockId = blockSel.Block.BlockId});
+            clientChannel.SendPacket(new DimensionSpawnRequest() { dimensionIndex = DimensionIndex, pos = pos, blockSel = blockSel, blockId = blockSel.Block.BlockId, mode = mode});
         }
     }
 
