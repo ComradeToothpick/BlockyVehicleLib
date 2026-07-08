@@ -146,6 +146,7 @@ public class EntityVehicle : EntityChunky
 
     public void Dispose()
     {
+        if (blocks is BlockyVehicle) ((BlockyVehicle)blocks).Dispose();
     }
     
     private double[] ApplyRotation(double[] angVelocity, double[] rot, double dt)
@@ -257,7 +258,18 @@ public class EntityVehicle : EntityChunky
             if (!blocks.Dirty) return;//Recalculate the DynamicCollisionBoxes on the client side only if the miniDimension is changed
         }
     }
-    
+
+    public void BlocksDirty()
+    {
+        this.blocks.Dirty = true;
+    }
+
+    public override void OnReceivedServerPos(bool isTeleport)
+    {
+        //base.OnReceivedServerPos(isTeleport);
+        ((BlockyVehicle)blocks).OnReceivedServerPos(isTeleport, this);
+    }
+
     public static double[] ConvertEulerAngles(double pitch, double yaw, double roll)//I think the maths here is wrong
     {
         double[] output = new double[4];
