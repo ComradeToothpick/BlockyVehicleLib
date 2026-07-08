@@ -1,4 +1,3 @@
-
 using System.Collections.Generic;
 using System.Numerics;
 using HarmonyLib;
@@ -21,25 +20,13 @@ namespace BlockyVehicleLib.Patches
     public static class DynamicPhysicsBehavior_Patch
     {
         [HarmonyPrefix]
-        public static bool Prefix(DynamicPhysicsBehaviour __instance)
+        public static bool Prefix(DynamicPhysicsBehaviour __instance, CompoundCollider? __result)
         {
             Entity entity = __instance.entity;
             if (entity is EntityVehicle)
             {
-                entity.Api.Logger.Event("Prefix EntityChunky executing");
-                PhysicsLibModSystem physics = entity.Api.ModLoader.GetModSystem<PhysicsLibModSystem>();
-                CompoundCollider cachedShape = null;
-                if (((EntityVehicle)entity).spawned)
-                {
-                    cachedShape = ((EntityVehicle)entity).GetShape();
-                    if (cachedShape == null)
-                    {
-                        entity.Api.Logger.Event("cachedShape is null");
-                        return false;
-                    }
-                    if(cachedShape.Boxes.Length == 0) entity.Api.Logger.Event("cachedShape.ManualChildBoxes is empty");
-                    entity.Api.Logger.Event("cachedShape.LocalCenterOfMassOffset: " + cachedShape.LocalCenterOfMassOffset);
-                }
+                //PhysicsLibModSystem physics = entity.Api.ModLoader.GetModSystem<PhysicsLibModSystem>();
+                __result = null;
                 return false;
             }
             return true;

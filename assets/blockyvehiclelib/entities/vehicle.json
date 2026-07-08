@@ -7,7 +7,7 @@
     "renderer": "Dummy",
     "behaviors": [
       {
-        "code": "blockyvehiclelib.vehiclephysicsmultibox"
+        "code": "blockyvehiclelib.vehiclephysics"
       },
       {
         "code": "dynamic-physics"
@@ -17,7 +17,7 @@
   "server": {
     "behaviors": [
       {
-        "code": "blockyvehiclelib.vehiclephysicsmultibox"
+        "code": "blockyvehiclelib.vehiclephysics"
       },
       {
         "code": "dynamic-physics"

@@ -34,7 +34,7 @@ public class EntityVehicle : EntityChunky
     //private const int dimRadius = 8;
     private BlockPos localOrigin;
     public override bool ApplyGravity => false;//I really didn't expect this to just work as well as it did, still lots of work to do though
-    public override bool IsInteractable => false;
+    public override bool IsInteractable => true;
     public bool IsRigidBody => true;
     
     public List<OrientedBox> dynamicBoxes = new();
@@ -123,14 +123,7 @@ public class EntityVehicle : EntityChunky
             //Pos.Yaw = angles[1];
             //Pos.Pitch = angles[2];
             Pos!.Motion.X = 0.01d;
-            //if (Pos.X > blocks.selectionTrackingOriginalPos.X + 1.5f) blocks.selectionTrackingOriginalPos.X += 1;
             ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);//Ensures no desync
-            ((BlockyVehicle)blocks).CurrentPos.Motion = Pos.Motion;//Hopefully prevents jittery movement
-            //this.blocks.CurrentPos = this.Pos;
-            //this.blocks.CurrentPos =  this.Pos;
-            //this.Pos.X += this.Pos.Motion.X * dt;
-            //this.Pos.Y += this.Pos.Motion.Y * dt;
-            //this.Pos.Z += this.Pos.Motion.Z * dt;
         }
         /*
         ((Entity) this).Pos.Motion.X = 0.01;
