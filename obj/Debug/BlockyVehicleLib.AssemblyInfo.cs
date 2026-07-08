@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BlockyVehicleLib")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+19d1ae6ca3e45dcb7e597c923dfa977fd5cef6ef")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+146584a40a4289e3311a60717675d1afef22e020")]
 [assembly: System.Reflection.AssemblyProductAttribute("BlockyVehicleLib")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BlockyVehicleLib")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

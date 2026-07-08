@@ -60,7 +60,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         api.Logger.Event(Mod.Info.ModID + ".vehicle");
         api.RegisterEntity(Mod.Info.ModID + ".vehicle", typeof(EntityVehicle));
         api.RegisterItemClass(Mod.Info.ModID + ".vehiclewand", typeof(ItemVehicleWand));
-        api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclephysicsmultibox", typeof(BehaviorPassivePhysicsMultiBoxVehicle));
+        api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclephysics", typeof(BehaviorPassivePhysicsVehicle));
         api.Network
             .RegisterChannel("VehicleNetworkApi")
             .RegisterMessageType<DimensionIndexRequest>()
