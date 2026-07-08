@@ -11,8 +11,10 @@ using BlockyVehicleLib.Items;
 using BlockyVehicleLib.Entities;
 using BlockyVehicleLib.Network;
 using Newtonsoft.Json.Linq;
+using PhysicsLib;
 using PhysicsLib.Api;
 using PhysicsLib.Entities.Behaviours;
+using PhysicsLib.patches;
 using Vintagestory.API.Client;
 using Vintagestory.API.Server;
 using Vintagestory.API.Config;
@@ -172,7 +174,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         int dimId = message.dimId;
         long entityId = message.entityId;
         Vec3d CoM = message.CoM;
-        BuiltCompound? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId, CoM);
+        CompoundCollider? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId, CoM);
         if (cachedShapes == null)
         {
             api.Logger.Event("Vehicle collider construction failed!");
@@ -212,6 +214,11 @@ public class BlockyVehicleLibModSystem : ModSystem
         bool loadedDim = false;
         //set the loaded minidimension to the correct index (should be unnecessary in current state, but will keep for future proofing)
         BlockPos pos = message.blockSel.Position.Copy();
+        /*Block b = message.blockSel.Block;
+        if (b is BlockMicroBlock)
+        {
+            Cuboidf[] microColliders = ((BlockMicroBlock)b).GetCollisionBoxes(api.World.BlockAccessor, pos);
+        }*/
         IPlayer[] players = sapi.Server.Players;
         if (messageDim == null)
         {
@@ -257,10 +264,10 @@ public class BlockyVehicleLibModSystem : ModSystem
             sapi.World.SpawnEntity(entity);
             _loadedEntityVehicles.TryAdd(message.dimensionIndex, entity.EntityId);
         }
-
         entity.Pos.SetPos(pos.X + 0.5f, pos.Y, pos.Z + 0.5f);
         entity.BlocksInitialize();
         dim.CurrentPos.SetPos(entity.Pos);
+        if (loadedDim) EntityVehicle.InitializeVehicle(entity, dim);//re-initialize to fix desync issue
         serverChannel.SendPacket(new DimensionSpawnClientResponse() {dimId = dim.subDimensionId, blockPos = pos, vecPos = message.pos, blockId = message.blockId}, (IServerPlayer) player);
         await WaitingOnClient();
         //Do these after client side
@@ -291,42 +298,6 @@ public class BlockyVehicleLibModSystem : ModSystem
         dim.CollectChunksForSending(players);
         api.Logger.Event("Vehicle Spawned Successfully");
     }
-    /*
-    internal static T? readInternalField<O, T>(ILogger logger, O obj, string fieldName)
-    {
-        if (obj == null)
-        {
-            logger.Error("{0}.{1} Cannot read internal field of null", typeof(O).Name, fieldName);
-            return default(T);
-        }
-
-        FieldInfo? field = typeof(O).GetField(
-            fieldName,
-            // Include public in case they change it to be public
-            BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance
-        );
-        if (field == null)
-        {
-            logger.Error("{0}.{1} does not exist", typeof(O).Name, fieldName);
-            return default(T);
-        }
-        if (field.IsPublic)
-        {
-            logger.Warning("{0}.{1} is public, reflection is no longer needed", typeof(O).Name, fieldName);
-        }
-        object? val = field.GetValue(obj);
-        if (val == null)
-        {
-            logger.Warning("{0}.{1} is null", typeof(O).Name, fieldName);
-            return default(T);
-        }
-        if (!val.GetType().IsAssignableTo(typeof(T)))
-        {
-            logger.Error("{0}.{1} has an unexpected type: {2} that is not assignable to {3}", typeof(O).Name, fieldName, val.GetType(), typeof(T));
-            return default(T);
-        }
-        return (T)val;
-    }*/
 
     public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos dimPos, BlockPos localOrigin, out int[] blockIds, out BlockPos[] localPos)
     {
@@ -334,20 +305,14 @@ public class BlockyVehicleLibModSystem : ModSystem
         localPos = new BlockPos[20];
         //int maxX = 0; int maxY = 0; int maxZ = 0;
         for (int i = 0; i < 10; i++)//Staircase formation
-        {
+        {//Need to swap X and Z components of localPos, not totally sure why
             dim.SetBlock(blockId, dimPos, new ItemStack());
             blockIds[2 * i] = dim.GetBlock(dimPos).BlockId;
-            localPos[2 * i] = dimPos - localOrigin;
-            //maxX = Math.Max(maxX, localPos[2 * i].X);
-            //maxY = Math.Max(maxY, localPos[2 * i].Y);
-            //maxZ = Math.Max(maxZ, localPos[2 * i].Z);
+            localPos[2 * i] = new BlockPos(dimPos.Z - localOrigin.Z,  dimPos.Y - localOrigin.Y, dimPos.X - localOrigin.X);
             dimPos.X += 1;
             dim.SetBlock(blockId, dimPos, new ItemStack());
             blockIds[2 * i + 1] = dim.GetBlock(dimPos).BlockId;
-            localPos[2 * i + 1] = dimPos -  localOrigin;
-            //maxX = Math.Max(maxX, localPos[2 * i + 1].X);
-            //maxY = Math.Max(maxY, localPos[2 * i + 1].Y);
-            //maxZ = Math.Max(maxZ, localPos[2 * i + 1].Z);
+            localPos[2 * i + 1] = new BlockPos(dimPos.Z - localOrigin.Z,  dimPos.Y - localOrigin.Y, dimPos.X - localOrigin.X);
             dimPos.Y += 1;
         }
     }
@@ -397,8 +362,8 @@ public class BlockyVehicleLibModSystem : ModSystem
             stack.RemoveAt(stack.Count - 1);
             
             if (mod.IsConstructed(pos))
-            {
-                BlockPos deltaPos = new BlockPos(pos.X - startPos.X, pos.Y - startPos.Y, pos.Z - startPos.Z, 0) ;
+            {//Need to swap X and Z components of deltaPos, not totally sure why
+                BlockPos deltaPos = new BlockPos(pos.Z - startPos.Z, pos.Y - startPos.Y, pos.X - startPos.X, 0) ;
                 int blockId = blockAccessor.GetBlock(pos).BlockId;
                 if (!dimBlocks.TryAdd(deltaPos, blockId)) api.Logger.Event("[BlockyVehicleModSystem.GetConstructedBlocks] Failed to collect Pos: " + pos + ", Block ID: " + blockId);
                 BlockPos blockPos = pos.DownCopy();
@@ -420,11 +385,26 @@ public class BlockyVehicleLibModSystem : ModSystem
         return dimBlocks;
     }
 
-    public BuiltCompound? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId, Vec3d CoM)
+    public CompoundCollider? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, long entityId, Vec3d CoM)
     {
-        if (api.Side == EnumAppSide.Server) return null;//Only needed on client side
-        BlockyVehicle dim = (BlockyVehicle)((ICoreClientAPI)api).World.MiniDimensions[dimId];
-        Entity entity = ((ICoreClientAPI)api).World.GetEntityById(entityId);
+        BlockyVehicle dim;
+        if (api.Side == EnumAppSide.Client)
+        {
+            dim = (BlockyVehicle)((ICoreClientAPI)api).World.MiniDimensions[dimId];
+        }
+        else
+        {
+            dim = _loadedMinidimensions[dimId];
+        }
+        Vec3f[] vecLocalPos = new Vec3f[localPos.Length];
+        for (int i = 0; i < localPos.Length; i++)
+        {
+            vecLocalPos[i] = new Vec3f();//Swapping x and z to correct orientation
+            vecLocalPos[i].X = (float) (localPos[i].X - CoM.X);
+            vecLocalPos[i].Y = (float) (localPos[i].Y - CoM.Y);
+            vecLocalPos[i].Z = (float) (localPos[i].Z - CoM.Z);
+        }
+        Entity entity = api.World.GetEntityById(entityId);
         if (entity == null)
         {
             api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Entity Not Found");
@@ -481,21 +461,26 @@ public class BlockyVehicleLibModSystem : ModSystem
                 //api.Logger.Event("Collision Box2 Half Extents: [{0}, {1}, {2}]", (collider2.X2 - collider2.X1)/2, (collider2.Y2 - collider2.Y1)/2 , (collider2.Z2 - collider2.Z1)/2);
                 //api.Logger.Event("Collision Box2 Center: [{0}, {1}, {2}]", (collider2.X2 + collider2.X1)/2, (collider2.Y2 + collider2.Y1)/2 , (collider2.Z2 + collider2.Z1)/2);
                 LocalBox box = new LocalBox()
-                {//There are some mild imprecision with the collision boxes, but that's a problem for the future.
-                    LocalPosition = new Vector3(-((collider2.Z2 + collider2.Z1)/2 + localPos[i].Z - 1), (collider2.Y2 + collider2.Y1)/2 + localPos[i].Y, (collider2.X2 + collider2.X1)/2 + localPos[i].X),//Swapping x and z to correct orientation
+                {
+                    LocalPosition = new Vector3(((collider2.X2 + collider2.X1)/2 + vecLocalPos[i].X), (collider2.Y2 + collider2.Y1)/2 + vecLocalPos[i].Y, (collider2.Z2 + collider2.Z1)/2 + vecLocalPos[i].Z),
                     LocalOrientation = Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), (float)((degY) * Math.PI / 180)),
-                    HalfExtents = new Vector3((collider2.Z2-collider2.Z1)/2, (collider2.Y2-collider2.Y1)/2, (collider2.X2-collider2.X1)/2)
+                    HalfExtents = new Vector3((collider2.X2-collider2.X1)/2, (collider2.Y2-collider2.Y1)/2, (collider2.Z2-collider2.Z1)/2)
                 };
                 boxList.Add(box);
             }
         }
-        BuiltCompound cachedShapes = new BuiltCompound()
+        CompoundCollider cachedShapes = new CompoundCollider()
         {
             LocalCenterOfMassOffset = new Vector3((float)CoM.X, (float)CoM.Y, (float)CoM.Z),
-            Boxes = boxList
+            Boxes = boxList.ToArray()
         };
-        
-        behaviour.VehicleChildBoxes = cachedShapes.Boxes;
+        PhysicsLibModSystem mod = api.ModLoader.GetModSystem<PhysicsLibModSystem>();
+        behaviour.collider = cachedShapes;
+        behaviour.boundingRadius = DynamicPhysicsBehaviour.ComputeBoundingRadius(cachedShapes);
+        mod.AddCompound(entity.EntityId.ToString(), cachedShapes);
+        mod.Registry.Register(behaviour);
+        IsCollidingPatch.Registry.Register(behaviour);
+        ApplyTerrainCollisionPatch.Registry.Register(behaviour);
         return cachedShapes;
     }
 
@@ -543,7 +528,7 @@ public class BlockyVehicleLibModSystem : ModSystem
             int dimIndex = GetMiniDimensionPlayerIndex(player);
             if (dimIndex == -1)
             {
-                BlockyVehicle dim = (BlockyVehicle) sapi.World.BlockAccessor.CreateMiniDimension(new Vec3d(0, 0, 0));
+                BlockAccessorMovable dim = (BlockAccessorMovable) sapi.World.BlockAccessor.CreateMiniDimension(new Vec3d(0, 0, 0));
                 int index = sapi.Server.LoadMiniDimension(dim);
                 _dimensionRegistry.Add(player.PlayerUID, index);
                 /*
