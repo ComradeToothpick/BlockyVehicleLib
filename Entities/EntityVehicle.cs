@@ -124,14 +124,8 @@ public class EntityVehicle : EntityChunky
             //Pos.Pitch = angles[2];
             Pos!.Motion.X = 0.01d;
             ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);//Ensures no desync
+            //Api.Logger.Event("World Pos: " + Pos);
         }
-        /*
-        ((Entity) this).Pos.Motion.X = 0.01;
-        ((Entity) this).Pos.Y = (double) (int) ((Entity) this).Pos.Y + 0.5;
-        ((Entity) this).Pos.Yaw = (float) (((Entity) this).Pos.X % 6.3) / 20f;
-        ((Entity) this).Pos.Pitch = (float) GameMath.Sin(((Entity) this).Pos.X % 6.3) / 5f;
-        ((Entity) this).Pos.Roll = (float) GameMath.Sin(((Entity) this).Pos.X % 12.6) / 3f;
-        */
     }
 
     public void SimPhysics(float dt)
@@ -159,77 +153,6 @@ public class EntityVehicle : EntityChunky
         Quaterniond.Add(output, output, out2);
         Quaterniond.Normalize(output, output);
         return output;
-    }
-
-    public CompoundCollider? GetShape()
-    {
-        return null;
-        /*Api.Logger.Event("GetShape is executing");
-        DynamicPhysicsBehaviour? behaviour = this.GetBehavior<DynamicPhysicsBehaviour>();
-        if (behaviour == null)
-        {
-            Api.Logger.Event("DynamicPhysicsBehaviour is null");
-            return null;
-        }
-
-        if (behaviour.VehicleChildBoxes == null)
-        {
-            Api.Logger.Event("behaviour.VehicleChildBoxes is null, creating a new list");
-            behaviour.VehicleChildBoxes = new List<ManualChildBox>();
-        }
-        //walk through the blocks in the minidimension, collect the shapes of the blocks and compile them together
-        if (this.blocks == null)
-        {
-            Api.Logger.Event("blocks (BlockAccessorMovable) is null");
-            return null;
-        }
-
-        if (this.blocks.Dirty && Api.Side == EnumAppSide.Server)
-        {
-            Api.Logger.Event("blocks are dirty, calling UpdateBlocks");
-            UpdateBlocks();
-        }
-        IBlockAccessor blockAccessor = this.blocks;
-        BuiltCompound cachedShapes = new BuiltCompound();
-        cachedShapes.ManualChildBoxes = new List<ManualChildBox>();
-        //blockAccessor.WalkBlocks(this.minPos, this.maxPos, (Action<Block, int, int, int>)((block, x, y, z) =>
-        for (int x = minPos.X; x <= maxPos.X; x++)
-        for (int y =  minPos.Y; y <= maxPos.Y; y++)
-        for (int z =  minPos.Z; z <= maxPos.Z; z++)
-        {
-            //BlockPos blockPos = new BlockPos(x, y, z, 1);//Have to do it this way as WalkBlocks is not dimensionally aware
-            Block block = blockAccessor.GetBlock(blockPos);
-            if (block.BlockId != 0)
-            {
-                CompositeShape shape = block.Shape.Clone();
-                Api.Logger.Event("Block Detected: " + block.BlockId);
-                ManualChildBox box1 = new ManualChildBox()
-                {
-                    HalfExtents = new Vector3(shape.Scale/2),
-                    LocalOrientation = Quaternion.CreateFromYawPitchRoll(shape.rotateY, shape.rotateX, shape.rotateZ),
-                    LocalPosition = new Vector3(shape.offsetX + x - localOrigin.X, shape.offsetY + y - localOrigin.Y, shape.offsetZ + z - localOrigin.Z)
-                };
-                behaviour.VehicleChildBoxes.Add(box1);
-                foreach (CompositeShape b in shape.Overlays)
-                {
-                    ManualChildBox box = new ManualChildBox()
-                    {
-                        HalfExtents = new Vector3(b.Scale/2),
-                        LocalOrientation = Quaternion.CreateFromYawPitchRoll(b.rotateY, b.rotateX, b.rotateZ),
-                        LocalPosition = new Vector3(b.offsetX + x - localOrigin.X, b.offsetY + y - localOrigin.Y, b.offsetZ + z - localOrigin.Z)
-                    };
-                    behaviour.VehicleChildBoxes.Add(box);
-                }
-            }
-            else
-            {
-                //Api.Logger.Event("Air detected at: ({0}, {1}, {2})",  x, y, z);
-            }
-        }//), true);
-        cachedShapes.ManualChildBoxes.AddRange(behaviour.VehicleChildBoxes);
-        ((BlockAccessorMovable)this.blocks).RecalculateCenterOfMass(Api.World);
-        cachedShapes.LocalCenterOfMassOffset = new Vector3((float)(((BlockAccessorMovable)this.blocks).CenterOfMass.X), (float)((BlockAccessorMovable)this.blocks).CenterOfMass.Y, (float)((BlockAccessorMovable)this.blocks).CenterOfMass.Z);
-        return cachedShapes;*/
     }
 
     public void UpdateBlocks(CompoundCollider? cachedShapes = null)

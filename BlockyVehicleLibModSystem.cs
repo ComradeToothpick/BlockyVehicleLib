@@ -107,27 +107,11 @@ public class BlockyVehicleLibModSystem : ModSystem
             api.Logger.Error("Could not find player entity");
             return;
         }
-        /*
-        var BVLbehaviors = new List<JsonObject>(1);
-
-        //Forcibly insert behaviors to ensure they are present
-        BVLbehaviors.Add(new(new JObject { ["code"] =  "blockyvehiclelib.entityvehiclephysics" }));
-
-        playerEntity.Server.BehaviorsAsJsonObj = [
-            ..playerEntity.Server.BehaviorsAsJsonObj,
-            ..BVLbehaviors
-        ];
-        
-        playerEntity.Client.BehaviorsAsJsonObj = [
-            ..playerEntity.Client.BehaviorsAsJsonObj,
-            ..BVLbehaviors
-        ];
-        */
     }
 
     public void OnDimensionIndexRequest(IServerPlayer player, DimensionIndexRequest message)
     {
-        api.Logger.Event("BlockyVehicleLibModSystem.OnDimensionIndexResponse (server side): " + message.playerName);
+        //api.Logger.Event("BlockyVehicleLibModSystem.OnDimensionIndexResponse (server side): " + message.playerName);
         int index = GetMiniDimensionPlayerIndex(player);
         ((ItemVehicleWand)api.World.Items[message.vehicleWandID]).DimensionIndex = index;
         serverChannel.SendPacket(new DimensionIndexResponse() { index = index, vehicleWandID = message.vehicleWandID}, player);
@@ -176,7 +160,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         CompoundCollider? cachedShapes = CollectBlocks(blockIds, localPos, dimId, entityId, CoM);
         if (cachedShapes == null)
         {
-            api.Logger.Event("Vehicle collider construction failed!");
+            api.Logger.Error("Vehicle collider construction failed!");
         }
     }
 
@@ -189,7 +173,7 @@ public class BlockyVehicleLibModSystem : ModSystem
     
     private void OnDimensionIndexResponse(DimensionIndexResponse message)
     {
-        api.Logger.Event("BlockyVehicleLibModSystem.OnDimensionIndexResponse (client side): " + message.index);
+        //api.Logger.Event("BlockyVehicleLibModSystem.OnDimensionIndexResponse (client side): " + message.index);
         ((ItemVehicleWand)api.World.Items[message.vehicleWandID]).DimensionIndex = message.index;
     }
 
@@ -223,7 +207,7 @@ public class BlockyVehicleLibModSystem : ModSystem
             dim = new BlockyVehicle((BlockAccessorBase)sapi.World.BlockAccessor, pos.ToVec3d(), sapi);
             sapi.Server.SetMiniDimension(dim, message.dimensionIndex);//this needs to be fixed
             _loadedMinidimensions.Add(message.dimensionIndex, dim);
-            sapi.Logger.Error("message not found, new dimension created");
+            //sapi.Logger.Error("message not found, new dimension created");
         }
         else
         {
@@ -235,7 +219,7 @@ public class BlockyVehicleLibModSystem : ModSystem
             else
             {
                 dim = new BlockyVehicle((BlockAccessorBase)sapi.World.BlockAccessor, pos.ToVec3d(), sapi);
-                sapi.Logger.Error("Mini dimension not found, new dimension created");
+                //sapi.Logger.Error("Mini dimension not found, new dimension created");
             }
             sapi.Server.SetMiniDimension(dim, message.dimensionIndex);
             dim.CurrentPos.SetPos(pos); //repeat this on client side
@@ -275,14 +259,14 @@ public class BlockyVehicleLibModSystem : ModSystem
         dim.RecalculateCenterOfMass(api.World);
         //Send relevant information to the client side to build the colliders
         serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId, CoM = dim.CenterOfMass}, (IServerPlayer) player);
-        api.Logger.Event("Server Side Center of Mass: " + dim.CenterOfMass);
+        //api.Logger.Event("Server Side Center of Mass: " + dim.CenterOfMass);
 
-        //CollectBlocks(blockIds, localPos, dim.subDimensionId, entity.EntityId, dim.CenterOfMass);
+        CollectBlocks(blockIds, localPos, dim.subDimensionId, entity.EntityId, dim.CenterOfMass);
         
         //sapi.World.BlockAccessor.SetBlock(blockId, pos2, 0);
         //dim.UnloadUnusedServerChunks();
         dim.CollectChunksForSending(players);
-        api.Logger.Event("Vehicle Spawned Successfully");
+        //api.Logger.Event("Vehicle Spawned Successfully");
     }
 
     public void DebugBuild(int blockId, BlockyVehicle dim, BlockPos pos, BlockPos localOrigin, out int[] blockIds, out BlockPos[] localPos)
@@ -327,65 +311,65 @@ public class BlockyVehicleLibModSystem : ModSystem
         Entity entity = api.World.GetEntityById(entityId);
         if (entity == null)
         {
-            api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Entity Not Found");
+            api.Logger.Warning("[BlockyVehicleModSystem.CollectBlocks] Entity Not Found");
             return null;
         }
         DynamicPhysicsBehaviour behaviour = entity.GetBehavior<DynamicPhysicsBehaviour>()!;
         behaviour.entity = entity;
         if (behaviour == null)
         {
-            api.Logger.Event("[BlockyVehicleModSystem.CollectBlocks] Dynamic Physics Behaviour Not Found");
+            api.Logger.Warning("[BlockyVehicleModSystem.CollectBlocks] Dynamic Physics Behaviour Not Found");
             return null;
         }
         List<LocalBox> boxList = new List<LocalBox>();
-        api.Logger.Event("blockIds.Length: " + blockIds.Length);
+        //api.Logger.Event("blockIds.Length: " + blockIds.Length);
         for (int i = 0; i < blockIds.Length; i++)
         {
             Block block = dim.GetBlock(blockIds[i]);
             int degY = 0;
             if (block.Code.Path.Contains("-north-"))
             {
-                api.Logger.Event("Block North: " + block.Code.Path);
-                degY = 90;
+                //api.Logger.Event("Block North: " + block.Code.Path);
+                degY = 0;
             }
             if (block.Code.Path.Contains("-west-"))
             {
-                api.Logger.Event("Block West: " + block.Code.Path);
-                degY = 180;
+                //api.Logger.Event("Block West: " + block.Code.Path);
+                degY = 90;
             }
 
             if (block.Code.Path.Contains("-south-"))
             {
-                api.Logger.Event("Block South: " + block.Code.Path);
-                degY = 270;
+                //api.Logger.Event("Block South: " + block.Code.Path);
+                degY = 180;
             }
 
             if (block.Code.Path.Contains("-east-"))
             {
-                api.Logger.Event("Block East: " + block.Code.Path);
-                degY = 0;
+                //api.Logger.Event("Block East: " + block.Code.Path);
+                degY = 270;
             }
             Cuboidf[] colliders = block.CollisionBoxes;
             foreach (Cuboidf collider in colliders)
             {
                 Cuboidf collider2 = collider.RotatedCopy(0, degY, 0, new Vec3d(0.5, 0.5, 0.5));
-                api.Logger.Event("Collision Box: " + collider.ToString());
-                api.Logger.Event("Collision Box Half Extents: [{0}, {1}, {2}]", (collider.X2 - collider.X1)/2, (collider.Y2-collider.Y1)/2 , (collider.Z2-collider.Z1)/2);
-                api.Logger.Event("Collision Box Center: [{0}, {1}, {2}]", (collider.X2 + collider.X1)/2, (collider.Y2 + collider.Y1)/2 , (collider.Z2 + collider.Z1)/2);
+                //api.Logger.Event("Collision Box: " + collider.ToString());
+                //api.Logger.Event("Collision Box Half Extents: [{0}, {1}, {2}]", (collider.X2 - collider.X1)/2, (collider.Y2-collider.Y1)/2 , (collider.Z2-collider.Z1)/2);
+                //api.Logger.Event("Collision Box Center: [{0}, {1}, {2}]", (collider.X2 + collider.X1)/2, (collider.Y2 + collider.Y1)/2 , (collider.Z2 + collider.Z1)/2);
                 collider2.X1 = (float)Math.Round(collider2.X1, 2, MidpointRounding.ToPositiveInfinity);
                 collider2.Y1 = (float)Math.Round(collider2.Y1, 2, MidpointRounding.ToPositiveInfinity);
                 collider2.Z1 = (float)Math.Round(collider2.Z1, 2, MidpointRounding.ToPositiveInfinity);
                 collider2.X2 = (float)Math.Round(collider2.X2, 2, MidpointRounding.ToPositiveInfinity);
                 collider2.Y2 = (float)Math.Round(collider2.Y2, 2, MidpointRounding.ToPositiveInfinity);
                 collider2.Z2 = (float)Math.Round(collider2.Z2, 2, MidpointRounding.ToPositiveInfinity);
-                api.Logger.Event("Collision Box2: [{0}, {1}, {2}] => [{3}, {4}, {5}]", collider2.X1, collider2.Y1, collider2.Z1,  collider2.X2, collider2.Y2, collider2.Z2);
-                api.Logger.Event("Collision Box2 Half Extents: [{0}, {1}, {2}]", (collider2.X2 - collider2.X1)/2, (collider2.Y2 - collider2.Y1)/2 , (collider2.Z2 - collider2.Z1)/2);
-                api.Logger.Event("Collision Box2 Center: [{0}, {1}, {2}]", (collider2.X2 + collider2.X1)/2 + vecLocalPos[i].X, (collider2.Y2 + collider2.Y1)/2 + vecLocalPos[i].Y, (collider2.Z2 + collider2.Z1)/2 + vecLocalPos[i].Z);
+                //api.Logger.Event("Collision Box2: [{0}, {1}, {2}] => [{3}, {4}, {5}]", collider2.X1, collider2.Y1, collider2.Z1,  collider2.X2, collider2.Y2, collider2.Z2);
+                //api.Logger.Event("Collision Box2 Half Extents: [{0}, {1}, {2}]", (collider2.X2 - collider2.X1)/2, (collider2.Y2 - collider2.Y1)/2 , (collider2.Z2 - collider2.Z1)/2);
+                //api.Logger.Event("Collision Box2 Center: [{0}, {1}, {2}]", (collider2.X2 + collider2.X1)/2 + vecLocalPos[i].X, (collider2.Y2 + collider2.Y1)/2 + vecLocalPos[i].Y, (collider2.Z2 + collider2.Z1)/2 + vecLocalPos[i].Z);
                 LocalBox box = new LocalBox()
                 {
                     LocalPosition = new Vector3(((collider2.X2 + collider2.X1)/2 + vecLocalPos[i].X), (collider2.Y2 + collider2.Y1)/2 + vecLocalPos[i].Y, ((collider2.Z2 + collider2.Z1)/2 + vecLocalPos[i].Z)),
                     LocalOrientation = Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), (float)((degY) * Math.PI / 180)),
-                    HalfExtents = new Vector3((collider2.X2-collider2.X1)/2, (collider2.Y2-collider2.Y1)/2, (collider2.Z2-collider2.Z1)/2)
+                    HalfExtents = new Vector3((collider2.Z2-collider2.Z1)/2, (collider2.Y2-collider2.Y1)/2, (collider2.X2-collider2.X1)/2)//Swap Z and X to correct block orientations
                 };
                 boxList.Add(box);
             }
