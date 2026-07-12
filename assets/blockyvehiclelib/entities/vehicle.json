@@ -10,7 +10,7 @@
         "code": "blockyvehiclelib.vehiclephysics"
       },
       {
-        "code": "dynamic-physics"
+        "code": "dynamic-collider-physics"
       }
     ]
   },
@@ -20,7 +20,7 @@
         "code": "blockyvehiclelib.vehiclephysics"
       },
       {
-        "code": "dynamic-physics"
+        "code": "dynamic-collider-physics"
       }
     ]
   },

@@ -7,7 +7,7 @@ using Vintagestory.Client.NoObf;
 
 namespace BlockyVehicleLib.Entities;
 
-public class BehaviorPassivePhysicsVehicle : EntityBehaviorPassivePhysics
+public class BehaviorPassivePhysicsVehicle : EntityBehaviorPassivePhysics 
 {
     public BehaviorPassivePhysicsVehicle(Entity entity) : base(entity)
     {

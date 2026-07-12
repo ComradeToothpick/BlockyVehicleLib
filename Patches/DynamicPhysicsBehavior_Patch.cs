@@ -1,4 +1,3 @@
-
 using System.Collections.Generic;
 using System.Numerics;
 using HarmonyLib;
@@ -23,8 +22,10 @@ namespace BlockyVehicleLib.Patches
         [HarmonyPrefix]
         public static bool Prefix(DynamicPhysicsBehaviour __instance, CompoundCollider? __result)
         {
-            if (__instance.entity is EntityVehicle)
+            Entity entity = __instance.entity;
+            if (entity is EntityVehicle)
             {
+                //PhysicsLibModSystem physics = entity.Api.ModLoader.GetModSystem<PhysicsLibModSystem>();
                 __result = null;
                 return false;
             }

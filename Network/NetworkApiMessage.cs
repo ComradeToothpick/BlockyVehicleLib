@@ -21,10 +21,8 @@ namespace BlockyVehicleLib.Network
     [ProtoContract]
     public class DimensionIndexResponse
     {
-        [ProtoMember(1)]
-        public int index;
-        [ProtoMember(2)]
-        public int vehicleWandID;
+        [ProtoMember(1)] public int index;
+        [ProtoMember(2)] public int vehicleWandID;
     }
     [ProtoContract]
     public class DimensionSpawnRequest
@@ -39,21 +37,16 @@ namespace BlockyVehicleLib.Network
     [ProtoContract]
     public class DimensionSpawnClientResponse
     {
-        [ProtoMember(1)]
-        public int dimId;
-
+        [ProtoMember(1)] public int dimId;
         [ProtoMember(2)] public BlockPos blockPos;
-        
         [ProtoMember(3)] public Vec3d vecPos;
-        
         [ProtoMember(4)] public int blockId;
     }
     
     [ProtoContract]
     public class DimensionSpawnClientComplete
     {
-        [ProtoMember(1)]
-        public bool success;
+        [ProtoMember(1)] public bool success;
     }
 
     [ProtoContract]
@@ -61,21 +54,6 @@ namespace BlockyVehicleLib.Network
     {
         [ProtoMember(1)] public long entityId;
         [ProtoMember(2)] public int subDimensionId;
-    }
-    
-    [ProtoContract]
-    public class VehicleDimPacket
-    {
-        [ProtoMember(1)]
-        public int dimensionIndex;
-        [ProtoMember(2)]
-        public int ChunkX;
-        [ProtoMember(3)]
-        public int ChunkZ;
-        [ProtoMember(4)]
-        public int[] blockIds;
-        [ProtoMember(5)]
-        public ushort[] QuadHeights;
     }
 
     [ProtoContract]
@@ -91,10 +69,10 @@ namespace BlockyVehicleLib.Network
     [ProtoContract]
     public class ChunkConstructionData
     {
-        [ProtoMember(1)]public byte[] Data;
-        [ProtoMember(2)]public int chunkX;
-        [ProtoMember(3)]public int chunkY;
-        [ProtoMember(4)]public int chunkZ;
+        [ProtoMember(1)] public byte[] Data;
+        [ProtoMember(2)] public int chunkX;
+        [ProtoMember(3)] public int chunkY;
+        [ProtoMember(4)] public int chunkZ;
     }
     
     [ProtoContract]

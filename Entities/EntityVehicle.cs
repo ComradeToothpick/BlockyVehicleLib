@@ -93,11 +93,6 @@ public class EntityVehicle : EntityChunky
         return sapi.World.GetPlayersAround(entityPos.XYZ, (float)sapi.World.DefaultEntityTrackingRange,
             (float)sapi.World.DefaultEntityTrackingRange);
     }
-
-    public void BlocksInitialize()
-    {
-        ((BlockyVehicle)blocks).Initialize(this);
-    }
     
     public override void OnGameTick(float dt)
     {
@@ -107,7 +102,7 @@ public class EntityVehicle : EntityChunky
         if (Api.Side == EnumAppSide.Server)
         {
             tickCounter++;
-            if (tickCounter % 100 == tickOffset)
+            if (tickCounter % 100 == tickOffset)//Need a better way to call this when needed
             {
                 UpdateBlocks();
             }
@@ -117,17 +112,30 @@ public class EntityVehicle : EntityChunky
         
         if (spawned)
         {
-            if (blocks.Dirty)
+            if (blocks!.Dirty)
             {
                 UpdateBlocks();
             }
             //Api.Logger.Event("Rotation values: "  + qRotation[0] + ", " + qRotation[1] + ", " + qRotation[2] + ", " + qRotation[3]);
             qRotation = ApplyRotation(angVelocity, qRotation, dt);
             float[] angles = Quaterniond.ToEulerAngles(qRotation);
-            
-            Pos.Motion.X = 0.01d;
+            //Pos.Roll = angles[0];
+            //Pos.Yaw = angles[1];
+            //Pos.Pitch = angles[2];
+            Pos!.Motion.X = 0.01d;
             ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);//Ensures no desync
+            //Api.Logger.Event("World Pos: " + Pos);
         }
+    }
+
+    public void SimPhysics(float dt)
+    {
+        
+    }
+    
+    public override void FromBytes(BinaryReader reader, bool forClient)
+    {
+        base.FromBytes(reader, forClient);
     }
 
     public void Dispose()
@@ -149,14 +157,14 @@ public class EntityVehicle : EntityChunky
 
     public void UpdateBlocks(CompoundCollider? cachedShapes = null)
     {
-        if (Api.Side == EnumAppSide.Server)
+        if (this.Api.Side == EnumAppSide.Server)
         {
-            IPlayer[] nearbyPlayers = GetNearbyPlayers((ICoreServerAPI)Api, Pos);
+            IPlayer[] nearbyPlayers = GetNearbyPlayers((ICoreServerAPI)Api, this.Pos);
             if (nearbyPlayers.Length > 0)
             {
                 IServerPlayer[] serverPlayerList = new IServerPlayer[nearbyPlayers.Length];
                 //If there are players nearby, send a packet to them.
-                ((BlockyVehicle)blocks).CollectChunksForSending(nearbyPlayers);
+                ((BlockyVehicle)this.blocks).CollectChunksForSending(nearbyPlayers);
                 for (int i = 0; i < serverPlayerList.Length; i++)
                 {
                     if (nearbyPlayers[i] is IServerPlayer)
@@ -170,8 +178,7 @@ public class EntityVehicle : EntityChunky
         }
         else
         {
-            if (!blocks.Dirty) return;
-            //Recalculate the DynamicCollisionBoxes on the client side only if the miniDimension is changed
+            if (!blocks.Dirty) return;//Recalculate the DynamicCollisionBoxes on the client side only if the miniDimension is changed
         }
     }
 

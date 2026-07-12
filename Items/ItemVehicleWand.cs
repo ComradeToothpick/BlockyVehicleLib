@@ -13,6 +13,7 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.Common;
+using Vintagestory.GameContent;
 using Vintagestory.Server;
 
 #nullable disable
@@ -43,10 +44,10 @@ public class ItemVehicleWand : Item
     private IPlayer player;
     //limit use of modSystem, always check if the api is client or server before using it
     private BlockyVehicleLibModSystem modSystem;
-    private EnumVehicleMode mode = EnumVehicleMode.Debug;
     private ModSystemBlockConstruction bco;
-    private BlockPos startPos = null;
-    private BlockPos endPos = null;
+    public BlockPos startPos = null;
+    public BlockPos endPos = null;
+    public EnumVehicleMode mode = EnumVehicleMode.Debug;
 
     public override void OnLoaded(ICoreAPI coreApi)
     {
@@ -79,9 +80,9 @@ public class ItemVehicleWand : Item
         IMiniDimension dim = ((ICoreClientAPI)api).World.GetOrCreateDimension(DimensionIndex, pos);
         api.Logger.Event("attempting to create an EntityChunky");
         entity = EntityVehicle.CreateVehicle((ICoreClientAPI)api, dim);
-
+                
         playerEntity.World.SpawnEntity(entity);
-
+        
         _isSpawning = false;
         api.Logger.Event("entity spawned");
     }
