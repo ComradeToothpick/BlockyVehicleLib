@@ -107,6 +107,12 @@ public class BlockyVehicleLibModSystem : ModSystem
             api.Logger.Error("Could not find player entity");
             return;
         }
+        //Load and apply config here
+        //Config needs to handle the following things:
+        //Maximum vehicles per player
+        //Maximum size of vehicles
+        //Capped speed of vehicles (0 for no limit)
+        //
     }
 
     public void OnDimensionIndexRequest(IServerPlayer player, DimensionIndexRequest message)
