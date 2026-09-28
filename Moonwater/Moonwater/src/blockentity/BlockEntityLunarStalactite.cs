@@ -12,7 +12,7 @@ public class BlockEntityLunarStalactite : BlockEntity
     public override void Initialize(ICoreAPI api)
     {
         base.Initialize(api);
-        dripListenerId = RegisterGameTickListener(new Action<float>(dropMoonwaterDroplets), 1200, 0);
+        dripListenerId = RegisterGameTickListener(new Action<float>(dropMoonwaterDroplets), 3000, 0);
     }
     
     public override void OnBlockRemoved()
