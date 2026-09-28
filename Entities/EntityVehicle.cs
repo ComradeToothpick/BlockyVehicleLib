@@ -127,6 +127,19 @@ public class EntityVehicle : EntityChunky
             //Api.Logger.Event("World Pos: " + Pos);
         }
     }
+    
+    public override void OnEntityLoaded()
+    {
+        //By the time the entity is loaded, it needs to have the following done either here or earlier:
+        //Setting the position and orientation (covered by base OnEntityLoaded I think, need to confirm)
+        //Setting the mini-dimension ID
+        //Setting the center of mass and total mass.
+        //Setting the velocity
+        //re-initialize rendering
+        //re-build colliders
+        //
+        base.OnEntityLoaded();
+    }
 
     public void SimPhysics(float dt)
     {
