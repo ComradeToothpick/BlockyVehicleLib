@@ -94,6 +94,59 @@ public class BlockyVehicleLibModSystem : ModSystem
             .SetMessageHandler<DimensionSpawnRequest>(OnDimensionSpawnRequest)
             .SetMessageHandler<DimensionSpawnClientComplete>(OnDimensionSpawnClientComplete);
         
+        /***COMMANDS***/
+        
+        var rootCommand = api.ChatCommands.Create("bv")
+            .WithDescription("Root command for editing, managing, and deleting block based vehicles.")
+            .RequiresPrivilege(Privilege.gamemode)
+            .RequiresPlayer();
+        
+        var subCommandDelete = rootCommand.BeginSubCommand("delete")//No aliases to prevent accidental deletion
+            .WithDescription(
+                "Deletes a vehicle and all its contents with the given vehicle ID")
+            .WithArgs(api.ChatCommands.Parsers
+                .Unparsed("vehicleId"))
+            .HandleWith((args) =>
+            {
+                return new TextCommandResult();
+            });
+        
+        var subCommandCreate = rootCommand.BeginSubCommand("create")
+            .WithDescription(
+                "Makes a new vehicle")
+            .WithArgs(api.ChatCommands.Parsers
+                .Unparsed("vehicleId"))
+            .HandleWith((args) =>
+            {
+                //Should be able to use selected volume, or the block the user is looking at (either checking adjacent blocks for construction or just the block individually)
+                return new TextCommandResult();
+            });
+        
+        var subCommandList = rootCommand.BeginSubCommand("list")
+            .WithDescription(
+                "Lists all vehicles, or all vehicles owned by a given player")
+            .WithArgs(api.ChatCommands.Parsers
+                .Unparsed("vehicleId"))
+            .HandleWith((args) =>
+            {
+                //Should accept player names and list the vehicles that player owns or "no player found"
+                //Could accept faction names to list all vehicles owned by members of the faction
+                //Could accept multiple names in one command
+                //Could accept region names to list all vehicles in a given region (depends on implementation of region names)
+                //Could accept a pair of coordinates or a coordinate and range to do similar to the above
+                
+                return new TextCommandResult();
+            });
+        
+        var subCommandTeleport = rootCommand.BeginSubCommand("teleport")//How should rotation and passengers be handled?
+            .WithDescription(
+                "Teleports a vehicle with the given vehicle ID to the given coordinate")
+            .WithArgs(api.ChatCommands.Parsers
+                .Unparsed("vehicleId"))
+            .HandleWith((args) =>
+            {
+                return new TextCommandResult();
+            });
         //Mod.Logger.Notification("Mini dimension loaded, index: " + index);
     }
 
