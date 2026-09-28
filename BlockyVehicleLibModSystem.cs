@@ -355,7 +355,17 @@ public class BlockyVehicleLibModSystem : ModSystem
         }
         else
         {
-            dim = _loadedMinidimensions[dimId];
+            try
+            {
+                dim = _loadedMinidimensions[dimId];
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+                
+            }
+            
         }
         //localPos is relative to the entity position
         //needs to be converted to be relative to CoM
