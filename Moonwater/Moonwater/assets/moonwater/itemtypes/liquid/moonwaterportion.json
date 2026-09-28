@@ -30,5 +30,12 @@
   },
   tpHandTransform: {
     translation: { x: -1.5, y: -1, z: -1.4 }
-  }
+  },
+  transitionableProps: [{
+    type: "Perish",
+    freshHours: { avg: 24 },
+    transitionHours: { avg: 0 },
+    transitionedStack: { type: "item", code: "game:waterportion" },
+    transitionRatio: 1
+  }]
 }

@@ -2,60 +2,8 @@
   {
     "code": "moonwater",
     "ingredients": [
-      {"type": "item", "code": "game:waterportion", "litres": 1, "consumelitres": 1}
+      {"type": "item", "code": "game:waterportion", "litres": 1}
     ],
-    "output": {
-      "type": "item",
-      "code": "moonwaterportion",
-      "litres": 1
-    }
-  },
-  {
-    "code": "moonwater",
-    "ingredients": [
-      {"type": "item", "code": "game:waterportion", "litres": 1, "consumelitres": 1},
-      {"type": "item", "code": "game:smokyquartz", "quantity": 1}
-    ],
-    "output": { 
-      "type": "item", 
-      "code": "moonwaterportion", 
-      "litres": 2
-    }
-  },
-  {
-    "code": "moonwater",
-    "ingredients": [
-      {"type": "item", "code": "game:waterportion", "litres": 1, "consumelitres": 1},
-      {"type": "item", "code": "game:rosequartz", "quantity": 1}
-    ],
-    "output": {
-      "type": "item",
-      "code": "moonwaterportion",
-      "litres": 2
-    }
-  },
-  {
-    "code": "moonwater",
-    "ingredients": [
-      {"type": "item", "code": "game:waterportion", "litres": 1, "consumelitres": 1},
-      {"type": "item", "code": "game:amethyst", "quantity": 1}
-    ],
-    "output": {
-      "type": "item",
-      "code": "moonwaterportion",
-      "litres": 3
-    }
-  },
-  {
-    "code": "moonwater",
-    "ingredients": [
-      {"type": "item", "code": "game:waterportion", "litres": 1, "consumelitres": 1},
-      {"type": "item", "code": "game:clearquartz", "quantity": 1}
-    ],
-    "output": {
-      "type": "item",
-      "code": "moonwaterportion",
-      "litres": 2
-    }
+    "output": {"type": "item", "code": "moonwaterportion", "litres": 1}
   }
 ]

@@ -128,6 +128,7 @@ public class BEQuartzBowl : BlockEntityLiquidContainer, ICoolingMedium
 
     protected void FindMatchingRecipe(IPlayer byPlayer)
     {
+        if (Api.World.Calendar.MoonPhase != EnumMoonPhase.Full) return;//Should only work during a full moon
         ItemSlot[] inputSlots = new ItemSlot[2]
         {
             this.inventory[0],
