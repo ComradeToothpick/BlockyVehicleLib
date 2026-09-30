@@ -278,6 +278,7 @@ public class BlockyVehicleLibModSystem : ModSystem
             else
             {
                 dim = new BlockyVehicle((BlockAccessorBase)sapi.World.BlockAccessor, pos.ToVec3d(), sapi);
+                _loadedMinidimensions.Add(message.dimensionIndex, dim);
                 //sapi.Logger.Error("Mini dimension not found, new dimension created");
             }
             sapi.Server.SetMiniDimension(dim, message.dimensionIndex);
