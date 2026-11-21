@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "vafqVgS2KJQ=",
+  "dgSpecHash": "yJUnCHZZuBE=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Henry\\AppData\\Roaming\\VintagestoryData\\Mods\\BlockyVehicleLib\\BlockyVehicleLib\\BlockyVehicleLib.csproj",
+  "projectFilePath": "C:\\Users\\Henry\\AppData\\Roaming\\VintagestoryData\\OldMods\\BlockyVehicleLib\\BlockyVehicleLib\\BlockyVehicleLib.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\Henry\\.nuget\\packages\\bepinex.assemblypublicizer.msbuild\\0.4.2\\bepinex.assemblypublicizer.msbuild.0.4.2.nupkg.sha512",
     "C:\\Users\\Henry\\.nuget\\packages\\newtonsoft.json\\13.0.4\\newtonsoft.json.13.0.4.nupkg.sha512"
   ],
   "logs": []

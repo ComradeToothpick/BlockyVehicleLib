@@ -14,8 +14,6 @@ namespace BlockyVehicleLib.Network
     public class DimensionIndexRequest
     {
         [ProtoMember(1)]
-        public string playerName;
-        [ProtoMember(2)]
         public int vehicleWandID;
     }
     [ProtoContract]
@@ -38,9 +36,9 @@ namespace BlockyVehicleLib.Network
     public class DimensionSpawnClientResponse
     {
         [ProtoMember(1)] public int dimId;
-        [ProtoMember(2)] public BlockPos blockPos;
+        [ProtoMember(2)] public BlockPos[] blockPos;
         [ProtoMember(3)] public Vec3d vecPos;
-        [ProtoMember(4)] public int blockId;
+        [ProtoMember(4)] public int[] blockIds;
     }
     
     [ProtoContract]
@@ -87,7 +85,7 @@ namespace BlockyVehicleLib.Network
         [ProtoMember(7)]public string LastGroupname;
     }
     
-    [ProtoContract]
+    /*[ProtoContract]
     public class ConstructedPrivilegeGrants
     {
         [ProtoMember(1)]public string OwnedByPlayerUid;
@@ -104,5 +102,5 @@ namespace BlockyVehicleLib.Network
         [ProtoMember(3)]public EnumBlockAccessFlags DefaultGrants = EnumBlockAccessFlags.BuildOrBreak | EnumBlockAccessFlags.Use;
         [ProtoMember(4)]public Dictionary<string, EnumBlockAccessFlags> PlayerGrants = new Dictionary<string, EnumBlockAccessFlags>();
         [ProtoMember(5)]public Dictionary<int, EnumBlockAccessFlags> GroupGrants = new Dictionary<int, EnumBlockAccessFlags>();
-    }
+    }*/
 }

@@ -13,8 +13,6 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
 using Vintagestory.Common;
-using PhysicsLib.Api;
-using PhysicsLib.Entities.Behaviours;
 using Vintagestory.GameContent;
 using Vintagestory.Server;
 using static Vintagestory.API.Config.GlobalConstants;
@@ -28,7 +26,8 @@ public class EntityVehicle : EntityChunky
     public double[] qRotation;
     public double[] angVelocity = new double[4];
     public bool spawned = false;
-    public List<Cuboidf> OrigCollisionBox = new List<Cuboidf>();
+    public List<Cuboidf> CollisionBoxes = new List<Cuboidf>();
+    private EntityBehaviorKinematicCollider kinematicCollider;
     //private BlockPos minPos = new BlockPos(1);
     //private BlockPos maxPos = new BlockPos(1);
     //private const int dimRadius = 8;
@@ -37,7 +36,6 @@ public class EntityVehicle : EntityChunky
     public override bool IsInteractable => true;
     public bool IsRigidBody => true;
     
-    public List<OrientedBox> dynamicBoxes = new();
     public EntityVehicle() : base()
     {
     }
@@ -48,15 +46,21 @@ public class EntityVehicle : EntityChunky
         this.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
     }
     
-    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockyVehicle dim)
+    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockyVehicle dim, Cuboidf[] initialColliders)
     {
+        entity.CollisionBoxes.AddRange(initialColliders);
+        entity.CollisionBoxes.Add(entity.CollisionBox);
         entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
+        entity.kinematicCollider = entity.GetBehavior<BehaviorKinematicVehicleCollider>();
+        if (entity.kinematicCollider == null)
+        {
+            entity.kinematicCollider = new BehaviorKinematicVehicleCollider(entity);
+        }
         entity.blocks = dim;
         entity.subDimensionIndex = entity.blocks.subDimensionId;
         entity.Pos.SetFrom(entity.blocks.CurrentPos);
         entity.blocks.Dirty = true;
         entity.blocks.TrackSelection = false;
-        entity.OrigCollisionBox.Add(new Cuboidf());
         entity.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
         entity.angVelocity = ConvertEulerAngles(0.0f, 0.0f, 0.0f);
         entity.angVelocity[3] = 0;
@@ -76,16 +80,16 @@ public class EntityVehicle : EntityChunky
         return entity;
     }
 
-    public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockyVehicle dim)
+    public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockyVehicle dim, Cuboidf[] initialColliders)
     {
         EntityVehicle entity = (EntityVehicle) sapi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        return InitializeVehicle(entity, dim);
+        return InitializeVehicle(entity, dim, initialColliders);
     }
     
-    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockyVehicle dim)
+    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockyVehicle dim, Cuboidf[] initialColliders)
     {
         EntityVehicle entity = (EntityVehicle) capi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        return InitializeVehicle(entity, dim);
+        return InitializeVehicle(entity, dim, initialColliders);
     }
 
     public static IPlayer[] GetNearbyPlayers(ICoreServerAPI sapi, EntityPos entityPos)
@@ -141,7 +145,7 @@ public class EntityVehicle : EntityChunky
         base.OnEntityLoaded();
     }
 
-    public void SimPhysics(float dt)
+    /*public void SimPhysics(float dt)
     {
         
     }
@@ -149,7 +153,7 @@ public class EntityVehicle : EntityChunky
     public override void FromBytes(BinaryReader reader, bool forClient)
     {
         base.FromBytes(reader, forClient);
-    }
+    }*/
 
     public void Dispose()
     {
@@ -168,7 +172,7 @@ public class EntityVehicle : EntityChunky
         return output;
     }
 
-    public void UpdateBlocks(CompoundCollider? cachedShapes = null)
+    public void UpdateBlocks(Cuboidf[]? cachedShapes = null)
     {
         if (this.Api.Side == EnumAppSide.Server)
         {

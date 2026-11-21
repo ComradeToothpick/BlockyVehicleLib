@@ -3,25 +3,24 @@
   "class": "blockyvehiclelib.vehicle",
   "hitboxSize": { "x": 1, "y": 1 },
   "shape": {"base": "vehicle"},
+  behaviorConfigs: {
+    kinematiccollider: {
+      carryEntities: true,
+      keepsSupportedEntitiesDry: true,
+      rotateWithEntity: true
+    }
+  },
   "client": {
     "renderer": "Dummy",
     "behaviors": [
-      {
-        "code": "blockyvehiclelib.vehiclephysics"
-      },
-      {
-        "code": "dynamic-collider-physics"
-      }
+      { "code": "blockyvehiclelib.vehiclephysics" },
+      { code: "blockyvehiclelib.vehiclekinematiccollider" }
     ]
   },
   "server": {
     "behaviors": [
-      {
-        "code": "blockyvehiclelib.vehiclephysics"
-      },
-      {
-        "code": "dynamic-collider-physics"
-      }
+      { "code": "blockyvehiclelib.vehiclephysics" },
+      { code: "blockyvehiclelib.vehiclekinematiccollider" }
     ]
   },
   "tags": ["inanimate", "vehicle"]

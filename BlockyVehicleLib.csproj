@@ -8,36 +8,36 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Reference Include="PhysicsLib">
-            <HintPath>..\..\..\..\..\..\RiderProjects\PhysicsLibLatest\Releases\physicslib\PhysicsLib.dll</HintPath>
-            <Private>false</Private>
-        </Reference>
+        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <Reference Include="VintagestoryAPI">
-            <HintPath>$(VINTAGE_STORY)/VintagestoryAPI.dll</HintPath>
+            <HintPath>$(VINTAGE_STORY)1.23/VintagestoryAPI.dll</HintPath>
             <Private>false</Private>
         </Reference>
-        <Reference Include="VSSurvivalMod">
-            <HintPath>$(VINTAGE_STORY)/Mods/VSSurvivalMod.dll</HintPath>
+        <Reference Include="VSSurvivalMod" Publicize="true">
+            <HintPath>$(VINTAGE_STORY)1.23/Mods/VSSurvivalMod.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="VSEssentials">
-            <HintPath>$(VINTAGE_STORY)/Mods/VSEssentials.dll</HintPath>
+        <Reference Include="VSEssentials" Publicize="true">
+            <HintPath>$(VINTAGE_STORY)1.23/Mods/VSEssentials.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="VSCreativeMod">
-            <HintPath>$(VINTAGE_STORY)/Mods/VSCreativeMod.dll</HintPath>
+        <Reference Include="VSCreativeMod" Publicize="true">
+            <HintPath>$(VINTAGE_STORY)1.23/Mods/VSCreativeMod.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="0Harmony">
-            <HintPath>$(VINTAGE_STORY)/Lib/0Harmony.dll</HintPath>
+            <HintPath>$(VINTAGE_STORY)1.23/Lib/0Harmony.dll</HintPath>
             <Private>False</Private>
         </Reference>
         <Reference Include="VintagestoryLib">
-            <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
+            <HintPath>$(VINTAGE_STORY)1.23/VintagestoryLib.dll</HintPath>
             <Private>false</Private>
         </Reference>
         <Reference Include="protobuf-net">
-            <HintPath>$(VINTAGE_STORY)/Lib/protobuf-net.dll</HintPath>
+            <HintPath>$(VINTAGE_STORY)1.23/Lib/protobuf-net.dll</HintPath>
             <Private>False</Private>
         </Reference>
     </ItemGroup>
@@ -60,28 +60,6 @@
 
     <ItemGroup>
       <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Compile Remove="Entities\PhysicsBehaviorBaseVehicle.cs" />
-      <Compile Remove="Entities\PModuleVehicle.cs" />
-      <Compile Remove="Entities\VehicleCollisionTester.cs" />
-      <Compile Remove="Entities\EntityBehaviorVehiclePhysics.cs" />
-      <Compile Remove="Entities\EntityControlledVehiclePhysics.cs" />
-      <Compile Remove="Entities\EntityBehaviorPlayerVehiclePhysics.cs" />
-      <Compile Remove="Entities\BVLBehaviorVehiclePhysics.cs" />
-      <Compile Remove="Util\**" />
-      <Compile Remove="Renderer\**" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <EmbeddedResource Remove="Util\**" />
-      <EmbeddedResource Remove="Renderer\**" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="Util\**" />
-      <None Remove="Renderer\**" />
     </ItemGroup>
 
 </Project>
