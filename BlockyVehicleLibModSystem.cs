@@ -36,6 +36,8 @@ public class BlockyVehicleLibModSystem : ModSystem
     private int _dimensionIndex = -1;
     private bool _spawnSuccess = false;
     private Harmony harmony;
+    private IServerNetworkChannel serverChannel;
+    private IClientNetworkChannel clientChannel;
 
     public override void StartPre(ICoreAPI coreApi)
     {
@@ -51,7 +53,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         api.RegisterEntity(Mod.Info.ModID + ".vehicle", typeof(EntityVehicle));
         api.RegisterItemClass(Mod.Info.ModID + ".vehiclewand", typeof(ItemVehicleWand));
         api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclephysics", typeof(BehaviorPassivePhysicsVehicle));
-        api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclekinematiccollider", typeof(BehaviorKinematicVehicleCollider));
+        api.RegisterEntityBehaviorClass(Mod.Info.ModID + ".vehiclecollider", typeof(BehaviorKinematicVehicleCollider));
         api.Network
             .RegisterChannel("VehicleNetworkApi")
             .RegisterMessageType<DimensionIndexRequest>()
@@ -62,8 +64,6 @@ public class BlockyVehicleLibModSystem : ModSystem
             .RegisterMessageType<VehicleEntityId>()
             .RegisterMessageType<VehicleBlocks>();
     }
-
-    IServerNetworkChannel serverChannel;
     
     public override void StartServerSide(ICoreServerAPI serverApi)
     {
@@ -172,7 +172,7 @@ public class BlockyVehicleLibModSystem : ModSystem
         return -1;
     }
 
-    IClientNetworkChannel clientChannel;
+    
     
     public override void StartClientSide(ICoreClientAPI clientApi)
     {
@@ -180,9 +180,7 @@ public class BlockyVehicleLibModSystem : ModSystem
 
         clientChannel = capi.Network.GetChannel("VehicleNetworkApi")
             .SetMessageHandler<DimensionIndexResponse>(OnDimensionIndexResponse)
-            .SetMessageHandler<DimensionSpawnClientResponse>(OnDimensionSpawnClientResponse)
-            .SetMessageHandler<VehicleEntityId>(OnVehicleEntityId)
-            .SetMessageHandler<VehicleBlocks>(BuildVehicleColliders);
+            .SetMessageHandler<DimensionSpawnClientResponse>(OnDimensionSpawnClientResponse);
     }
     
     private void OnDimensionIndexResponse(DimensionIndexResponse message)
@@ -242,25 +240,26 @@ public class BlockyVehicleLibModSystem : ModSystem
         int blockId = message.blockId;
         DebugBuild(blockId, dim, dimPos, localOrigin, out int[] blockIds, out BlockPos[] localPos);
         dim.RecalculateCenterOfMass(api.World);
-        Cuboidf[] initialColliders = CollectBlocks(blockIds, localPos, dim.subDimensionId, dim.CenterOfMass);
+        Cuboidd[] initialColliders = CollectBlocks(blockIds, localPos, dim.subDimensionId);
+        for (int i = 0; i < initialColliders.Length; i++)
+        {
+            if (initialColliders[i] == null) initialColliders[i] = new Cuboidd(0, 0, 0, 0, 0, 0);
+        }
         EntityVehicle entity;
-        if (loadedDim && _loadedEntityVehicles.TryGetValue(message.dimensionIndex, out long entityId))
-        {
-            entity = (EntityVehicle)sapi.World.GetEntityById(entityId);
-        }
-        else
-        {
-            entity = EntityVehicle.CreateVehicle(sapi, dim, initialColliders);
-            sapi.World.SpawnEntity(entity);
-            _loadedEntityVehicles.TryAdd(message.dimensionIndex, entity.EntityId);
-        }
+        
+        entity = EntityVehicle.CreateVehicle(sapi, dim);
+        EntityVehicle.InitializeVehicle(entity, dim);//re-initialize to fix desync issue
+        sapi.World.SpawnEntity(entity);
+        //if (entity.GetBehavior<EntityBehaviorKinematicCollider>() == null) entity.AddBehavior(new EntityBehaviorKinematicCollider(entity));
+        _loadedEntityVehicles.Add(message.dimensionIndex, entity.EntityId);
         
         entity.Pos.SetPos(pos.X + 0.5f, pos.Y + 1f, pos.Z + 0.5f);
         dim.CurrentPos.SetPos(entity.Pos);
-        EntityVehicle.InitializeVehicle(entity, dim, initialColliders);//re-initialize to fix desync issue
         
-        serverChannel.SendPacket(new DimensionSpawnClientResponse() {dimId = dim.subDimensionId, blockPos = pos, vecPos = message.pos, blockId = message.blockId}, (IServerPlayer) player);
+        serverChannel.SendPacket(new DimensionSpawnClientResponse() {dimId = dim.subDimensionId, blockPos = localPos, localOrigin = message.blockSel.Position, vecPos = message.pos, blockIds = blockIds}, (IServerPlayer) player);
         await WaitingOnClient();
+        BehaviorKinematicVehicleCollider? collider = entity.GetBehavior<BehaviorKinematicVehicleCollider>();
+        collider?.SetCollisionBoxes(initialColliders, blockIds);
         serverChannel.SendPacket(new VehicleBlocks() {blockIds =  blockIds, localPos = localPos, dimId = dim.subDimensionId, entityId = entity.EntityId, CoM = dim.CenterOfMass}, (IServerPlayer) player);
         
         dim.CollectChunksForSending(players);
@@ -283,8 +282,9 @@ public class BlockyVehicleLibModSystem : ModSystem
         }
     }
 
-    public Cuboidf[]? CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId, Vec3d CoM)
+    public Cuboidd[] CollectBlocks(int[] blockIds, BlockPos[] localPos, int dimId)
     {
+        api.Logger.Event("Collecting blocks: " + blockIds.Length + ", " + localPos.Length + ", " + dimId);
         BlockyVehicle dim;
         if (api.Side == EnumAppSide.Client)
         {
@@ -309,13 +309,14 @@ public class BlockyVehicleLibModSystem : ModSystem
         Vec3f[] vecLocalPos = new Vec3f[localPos.Length];
         for (int i = 0; i < localPos.Length; i++)
         {
-            vecLocalPos[i] = new Vec3f();//Swapping x and z to correct orientation
-            vecLocalPos[i].X = (float) (localPos[i].X - CoM.X);
-            vecLocalPos[i].Y = (float) (localPos[i].Y - CoM.Y);
-            vecLocalPos[i].Z = (float) (localPos[i].Z - CoM.Z);
+            if (localPos[i] == null) continue;
+            vecLocalPos[i] = new Vec3f();
+            vecLocalPos[i].X = (float) (localPos[i].Z);
+            vecLocalPos[i].Y = (float) (localPos[i].Y);
+            vecLocalPos[i].Z = (float) (localPos[i].X);
         }
         
-        List<Cuboidf> boxList = new List<Cuboidf>();
+        List<Cuboidd> boxList = new List<Cuboidd>();
         for (int i = 0; i < blockIds.Length; i++)
         {
             Block block = dim.GetBlock(blockIds[i]);
@@ -342,33 +343,48 @@ public class BlockyVehicleLibModSystem : ModSystem
             foreach (Cuboidf collider in colliders)
             {
                 Cuboidf collider2 = collider.RotatedCopy(0, degY, 0, new Vec3d(0.5, 0.5, 0.5));
-                collider2.X1 = (float)Math.Round(collider2.X1 + localPos[i].X, 2, MidpointRounding.ToPositiveInfinity);
-                collider2.Y1 = (float)Math.Round(collider2.Y1 + localPos[i].Y, 2, MidpointRounding.ToPositiveInfinity);
-                collider2.Z1 = (float)Math.Round(collider2.Z1 + localPos[i].Z, 2, MidpointRounding.ToPositiveInfinity);
-                collider2.X2 = (float)Math.Round(collider2.X2 + localPos[i].X, 2, MidpointRounding.ToPositiveInfinity);
-                collider2.Y2 = (float)Math.Round(collider2.Y2 + localPos[i].Y, 2, MidpointRounding.ToPositiveInfinity);
-                collider2.Z2 = (float)Math.Round(collider2.Z2 + localPos[i].Z, 2, MidpointRounding.ToPositiveInfinity);
-                boxList.Add(collider2);
+                collider2.X1 = (float)Math.Round(collider2.X1 + vecLocalPos[i].X, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Y1 = (float)Math.Round(collider2.Y1 + vecLocalPos[i].Y, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Z1 = (float)Math.Round(collider2.Z1 + vecLocalPos[i].Z - 1, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.X2 = (float)Math.Round(collider2.X2 + vecLocalPos[i].X, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Y2 = (float)Math.Round(collider2.Y2 + vecLocalPos[i].Y, 2, MidpointRounding.ToPositiveInfinity);
+                collider2.Z2 = (float)Math.Round(collider2.Z2 + vecLocalPos[i].Z - 1, 2, MidpointRounding.ToPositiveInfinity);
+                boxList.Add(collider2.ToDouble());
             }
         }
+        api.Logger.Event("Collected " + boxList.Count + " blocks");
         return boxList.ToArray();
     }
 
-    /*private void OnDimensionSpawnClientResponse(DimensionSpawnClientResponse message)
+    private async void OnDimensionSpawnClientResponse(DimensionSpawnClientResponse message)
     {
         if (api.Side != EnumAppSide.Client) return;
         BlockyVehicle dim = new BlockyVehicle((BlockAccessorBase)capi.World.BlockAccessor, message.vecPos, capi);
         dim.SetSubDimensionId(message.dimId);
         capi.World.MiniDimensions[message.dimId] = dim;
         //IMiniDimension dim = capi.World.GetOrCreateDimension(message.dimId, message.vecPos);
-        Cuboidf[] initialColliders = CollectBlocks(message.blockIds, message.blockPos, dim.subDimensionId, dim.CenterOfMass);
+        
         Vec3d newPos = message.vecPos.Add(new Vec3f(0.5f, 1.0f, 0.5f));
         dim.CurrentPos.SetPos(newPos);
-        dim.selectionTrackingOriginalPos = dim.CenterOfMass.AsBlockPos;//Need to set this for it to render in the world
-        EntityVehicle entity = EntityVehicle.CreateVehicle(capi, dim, initialColliders);
+        dim.selectionTrackingOriginalPos = message.localOrigin;//Need to set this for it to render in the world
+        
+        EntityVehicle entity = EntityVehicle.CreateVehicle(capi, dim);
+        
         capi.World.SpawnEntity(entity);
-        capi.Network.GetChannel("VehicleNetworkApi").SendPacket<DimensionSpawnClientComplete>(new DimensionSpawnClientComplete() {success = true});
-    }*/
+        
+        EntityVehicle.InitializeVehicle(entity, dim);//re-initialize to fix desync issue
+        
+        Cuboidd[] initialDColliders = CollectBlocks(message.blockIds, message.blockPos, dim.subDimensionId);
+        Cuboidf[] colliders = new Cuboidf[initialDColliders.Length];
+        for (int i = 0; i < initialDColliders.Length; i++)
+        {
+            colliders[i] = initialDColliders[i].ToFloat().Clone();
+        }
+        
+        entity.SetVehicleColliders(initialDColliders, message.blockIds);
+        
+        capi.Network.GetChannel("VehicleNetworkApi").SendPacket(new DimensionSpawnClientComplete() {success = true});
+    }
     
     private void OnDimensionSpawnClientComplete(IPlayer player, DimensionSpawnClientComplete message)
     {
@@ -384,6 +400,15 @@ public class BlockyVehicleLibModSystem : ModSystem
             await Task.Delay(1);
         }
         _spawnSuccess = false;
+    }
+    
+    private async Task WaitingOnClientBehavior(BehaviorKinematicVehicleCollider? collider)
+    {
+        if (collider == null)
+        {
+            capi.Logger.Error("Waiting on client behavior");
+            await Task.Delay(10);
+        }
     }
     
     private void OnPlayerJoin(IPlayer player)

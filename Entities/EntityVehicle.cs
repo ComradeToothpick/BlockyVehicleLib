@@ -19,15 +19,20 @@ using static Vintagestory.API.Config.GlobalConstants;
 
 namespace BlockyVehicleLib.Entities;
 
-public class EntityVehicle : EntityChunky
+public class EntityVehicle : EntityChunky, IKinematicColliderTransformProvider
 {
+    private ICoreServerAPI sapi;
+    private ICoreClientAPI capi;
     public int tickOffset = 0;
     protected int tickCounter = 0;
     public double[] qRotation;
     public double[] angVelocity = new double[4];
     public bool spawned = false;
-    public List<Cuboidf> CollisionBoxes = new List<Cuboidf>();
-    private EntityBehaviorKinematicCollider kinematicCollider;
+    /*public Cuboidf[] CollisionBoxes;
+    public Cuboidd[] DCollisionBoxes;*/
+    public int[] blockIds;
+    internal BehaviorKinematicVehicleCollider? kinematicCollider;
+    //internal BehaviorKinematicVehicleCollider kinematicCollider;
     //private BlockPos minPos = new BlockPos(1);
     //private BlockPos maxPos = new BlockPos(1);
     //private const int dimRadius = 8;
@@ -46,16 +51,9 @@ public class EntityVehicle : EntityChunky
         this.qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
     }
     
-    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockyVehicle dim, Cuboidf[] initialColliders)
+    public static EntityVehicle InitializeVehicle(EntityVehicle entity, BlockyVehicle dim)
     {
-        entity.CollisionBoxes.AddRange(initialColliders);
-        entity.CollisionBoxes.Add(entity.CollisionBox);
         entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
-        entity.kinematicCollider = entity.GetBehavior<BehaviorKinematicVehicleCollider>();
-        if (entity.kinematicCollider == null)
-        {
-            entity.kinematicCollider = new BehaviorKinematicVehicleCollider(entity);
-        }
         entity.blocks = dim;
         entity.subDimensionIndex = entity.blocks.subDimensionId;
         entity.Pos.SetFrom(entity.blocks.CurrentPos);
@@ -67,7 +65,6 @@ public class EntityVehicle : EntityChunky
         entity.Code = new AssetLocation("blockyvehiclelib:vehicle");
         entity.WatchedAttributes.SetAttribute("dim", new IntAttribute(dim.subDimensionId));
         entity.tickOffset = dim.subDimensionId % 100;
-        
         BlockPos blockPos = new BlockPos(1);
         ((BlockyVehicle)entity.blocks).AdjustPosForSubDimension(ref blockPos);
         //blockPos.X = 0 + dim.subDimensionId % 4096 /*0x1000*/ * 16384 /*0x4000*/ + 8192 /*0x2000*/;
@@ -80,16 +77,20 @@ public class EntityVehicle : EntityChunky
         return entity;
     }
 
-    public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockyVehicle dim, Cuboidf[] initialColliders)
+    public static EntityVehicle CreateVehicle(ICoreServerAPI sapi, BlockyVehicle dim)
     {
         EntityVehicle entity = (EntityVehicle) sapi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        return InitializeVehicle(entity, dim, initialColliders);
+        entity.sapi = sapi;
+        entity.Api = sapi;
+        return InitializeVehicle(entity, dim);
     }
     
-    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockyVehicle dim, Cuboidf[] initialColliders)
+    public static EntityVehicle CreateVehicle(ICoreClientAPI capi, BlockyVehicle dim)
     {
         EntityVehicle entity = (EntityVehicle) capi.World.ClassRegistry.CreateEntity("blockyvehiclelib.vehicle");
-        return InitializeVehicle(entity, dim, initialColliders);
+        entity.capi = capi;
+        entity.Api = capi;
+        return InitializeVehicle(entity, dim);
     }
 
     public static IPlayer[] GetNearbyPlayers(ICoreServerAPI sapi, EntityPos entityPos)
@@ -100,26 +101,21 @@ public class EntityVehicle : EntityChunky
     
     public override void OnGameTick(float dt)
     {
-        if (blocks == null || Pos == null)
-            Die(EnumDespawnReason.Removed);
+        if (blocks == null || Pos == null) Die(EnumDespawnReason.Removed);
         base.OnGameTick(dt);
-        if (Api.Side == EnumAppSide.Server)
-        {
-            tickCounter++;
-            if (tickCounter % 100 == tickOffset)//Need a better way to call this when needed
-            {
-                UpdateBlocks();
-            }
-
-            if (tickCounter == 100) tickCounter = 0;
-        }
         
         if (spawned)
         {
-            if (blocks!.Dirty)
+            if (tickCounter % 100 == tickOffset)//Need a better way to call this when needed
             {
+                if (kinematicCollider == null) kinematicCollider = GetBehavior<BehaviorKinematicVehicleCollider>();
+                if (kinematicCollider == null) Api.Logger.Error("Kinematic collider is still null");
+                else Api.Logger.Error("Kinematic collider is not null!");
                 UpdateBlocks();
             }
+            tickCounter++;
+
+            if (tickCounter == 100) tickCounter = 0;
             //Api.Logger.Event("Rotation values: "  + qRotation[0] + ", " + qRotation[1] + ", " + qRotation[2] + ", " + qRotation[3]);
             qRotation = ApplyRotation(angVelocity, qRotation, dt);
             float[] angles = Quaterniond.ToEulerAngles(qRotation);
@@ -129,6 +125,32 @@ public class EntityVehicle : EntityChunky
             Pos!.Motion.X = 0.01d;
             ((BlockyVehicle)blocks).CurrentPos.SetPos(Pos);//Ensures no desync
             //Api.Logger.Event("World Pos: " + Pos);
+        }
+    }
+
+    public void SetVehicleColliders(Cuboidd[] collisionBoxes, int[] blockIds)
+    {
+        if (collisionBoxes == null)
+        {
+            Api.Logger.Error("Collision boxes are null!");
+            return;
+        }
+        /*DCollisionBoxes = collisionBoxes;
+        CollisionBoxes = new Cuboidf[collisionBoxes.Length];
+        for (int i = 0; i < collisionBoxes.Length; i++)
+        {
+            if (collisionBoxes[i] == null) collisionBoxes[i] = new Cuboidd(0, 0, 0, 0, 0, 0);
+            CollisionBoxes[i] = collisionBoxes[i].ToFloat().Clone();
+        }*/
+
+        if (kinematicCollider != null)
+        {
+            Api.Logger.Event("Setting kinematic colliders");
+            kinematicCollider.SetCollisionBoxes(collisionBoxes, blockIds);
+        }
+        else
+        {
+            Api.Logger.Error("Kinematic colliders behavior is null");
         }
     }
     
@@ -147,9 +169,9 @@ public class EntityVehicle : EntityChunky
 
     /*public void SimPhysics(float dt)
     {
-        
+
     }
-    
+
     public override void FromBytes(BinaryReader reader, bool forClient)
     {
         base.FromBytes(reader, forClient);
@@ -172,16 +194,16 @@ public class EntityVehicle : EntityChunky
         return output;
     }
 
-    public void UpdateBlocks(Cuboidf[]? cachedShapes = null)
+    public void UpdateBlocks()
     {
-        if (this.Api.Side == EnumAppSide.Server)
+        if (Api.Side == EnumAppSide.Server)
         {
             IPlayer[] nearbyPlayers = GetNearbyPlayers((ICoreServerAPI)Api, this.Pos);
             if (nearbyPlayers.Length > 0)
             {
                 IServerPlayer[] serverPlayerList = new IServerPlayer[nearbyPlayers.Length];
                 //If there are players nearby, send a packet to them.
-                ((BlockyVehicle)this.blocks).CollectChunksForSending(nearbyPlayers);
+                ((BlockyVehicle)blocks).CollectChunksForSending(nearbyPlayers);
                 for (int i = 0; i < serverPlayerList.Length; i++)
                 {
                     if (nearbyPlayers[i] is IServerPlayer)
@@ -193,10 +215,6 @@ public class EntityVehicle : EntityChunky
                 ((ICoreServerAPI)Api).Network.GetChannel("VehicleNetworkApi").SendPacket(new VehicleEntityId {entityId = this.EntityId, subDimensionId = this.subDimensionIndex}, serverPlayerList);
             }
         }
-        else
-        {
-            if (!blocks.Dirty) return;//Recalculate the DynamicCollisionBoxes on the client side only if the miniDimension is changed
-        }
     }
 
     public void BlocksDirty()
@@ -207,7 +225,7 @@ public class EntityVehicle : EntityChunky
     public override void OnReceivedServerPos(bool isTeleport)
     {
         //base.OnReceivedServerPos(isTeleport);
-        ((BlockyVehicle)blocks).OnReceivedServerPos(isTeleport, this);
+        ((BlockyVehicle)((BlockAccessorMovable)blocks)).OnReceivedServerPos(isTeleport, this);
     }
 
     public static double[] ConvertEulerAngles(double pitch, double yaw, double roll)//I think the maths here is wrong
@@ -222,5 +240,14 @@ public class EntityVehicle : EntityChunky
         output[3] = Math.Cos(yaw / 2) * Math.Cos(pitch / 2) * Math.Cos(roll / 2) - 
                     Math.Sin(yaw / 2) * Math.Sin(pitch / 2) * Math.Sin(roll / 2);
         return output;
+    }
+
+    public ColliderTransform GetKinematicColliderTransform()
+    {
+        if (qRotation == null)
+        {
+            qRotation = Quaterniond.FromValues(0.0, 0.0, 0.0, 1.0);
+        }
+        return new ColliderTransform(Pos, qRotation);
     }
 }

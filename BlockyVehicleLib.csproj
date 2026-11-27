@@ -32,7 +32,7 @@
             <HintPath>$(VINTAGE_STORY)1.23/Lib/0Harmony.dll</HintPath>
             <Private>False</Private>
         </Reference>
-        <Reference Include="VintagestoryLib">
+        <Reference Include="VintagestoryLib" Publicize="true">
             <HintPath>$(VINTAGE_STORY)1.23/VintagestoryLib.dll</HintPath>
             <Private>false</Private>
         </Reference>

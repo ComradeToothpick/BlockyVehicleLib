@@ -185,7 +185,7 @@ public class ItemVehicleWand : Item
             //Reset will need to happen if the item is ever removed from the player's inventory.
             if (DimensionIndex == -1)
             {
-                clientChannel.SendPacket(new DimensionIndexRequest() { playerName = player.PlayerUID, vehicleWandID = this.Id});
+                clientChannel.SendPacket(new DimensionIndexRequest() { vehicleWandID = this.Id});
                 await Waiting();
                 if (DimensionIndex == -1)
                 {

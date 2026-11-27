@@ -37,8 +37,11 @@ namespace BlockyVehicleLib.Network
     {
         [ProtoMember(1)] public int dimId;
         [ProtoMember(2)] public BlockPos[] blockPos;
-        [ProtoMember(3)] public Vec3d vecPos;
-        [ProtoMember(4)] public int[] blockIds;
+        [ProtoMember(3)] public BlockPos localOrigin;
+        [ProtoMember(4)] public Vec3d vecPos;
+        [ProtoMember(5)] public int[] blockIds;
+        [ProtoMember(6)] public long colliderId;
+        [ProtoMember(7)] public long EntityId;
     }
     
     [ProtoContract]
